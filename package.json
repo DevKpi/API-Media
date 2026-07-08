@@ -1,0 +1,21 @@
+{
+  "name": "api-media",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DevKpi/API-Media.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/DevKpi/API-Media/issues"
+  },
+  "homepage": "https://github.com/DevKpi/API-Media#readme"
+}
