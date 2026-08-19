@@ -3,6 +3,7 @@ import express from "express";
 const puerto = 3000;
 
 const app = express();
+app.use(express.json());
 
 const persona = [
   { id: 1, nombre: "Leonardo", apellido: "Eckert" },
@@ -16,6 +17,13 @@ app.get("/", (req, res) => {
 
 app.get("/persona", (req, res) => {
   res.json(persona);
+});
+
+app.post("/crear", (req, res) => {
+  const { id, nombre, apellido } = req.body;
+  const nuevaPersona = { id, nombre, apellido };
+  persona.push(nuevaPersona);
+  res.status(201).json(nuevaPersona);
 });
 
 app.get("/texto", (req, res) => {
