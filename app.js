@@ -18,6 +18,10 @@ app.get("/html", (req, res) => {
   res.send("<h1>Bienvenido a la API de Media!</h1>");
 });
 
+app.get("/test", (req, res) => {
+  res.send("Testeo");
+});
+
 app.use((req, res) => {
   res.status(404).json({ message: "Ruta no encontrada" });
 });
