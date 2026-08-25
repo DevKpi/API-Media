@@ -36,6 +36,17 @@ app.put("/actualizar/:id", (req, res) => {
   res.json(persona[personaIndex]);
 });
 
+app.patch("/patch/:id", (req, res) => {
+  const id = parseInt(req.params.id);
+  const personaIndex = persona.findIndex((p) => p.id === id);
+  if (personaIndex === -1) {
+    return res.status(404).json({ message: "Persona no encontrada" });
+  }
+  persona[personaIndex] = { ...persona[personaIndex], ...req.body };
+  res.json(persona[personaIndex]);
+});
+
+
 app.delete("/eliminar/:id", (req, res) => {
   const id = parseInt(req.params.id);
   const personaIndex = persona.findIndex((p) => p.id === id);
