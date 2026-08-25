@@ -20,10 +20,9 @@ app.get("/persona", (req, res) => {
 });
 
 app.post("/crear", (req, res) => {
-  const { id, nombre, apellido } = req.body;
-  const nuevaPersona = { id, nombre, apellido };
-  persona.push(nuevaPersona);
-  res.status(201).json(nuevaPersona);
+  persona.push(req.body);
+  console.log("Personas en el arreglo:", persona);
+  res.status(201).json(persona);
 });
 
 app.get("/texto", (req, res) => {
