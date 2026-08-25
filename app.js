@@ -21,8 +21,29 @@ app.get("/persona", (req, res) => {
 
 app.post("/crear", (req, res) => {
   persona.push(req.body);
-  console.log("Personas en el arreglo:", persona);
-  res.status(201).json(persona);
+  const nombres = persona.map((p) => p.nombre);
+  console.log("Nombres en el arreglo:", nombres);
+  res.status(201).json(nombres);
+});
+
+app.put("/actualizar/:id", (req, res) => {
+  const id = parseInt(req.params.id);
+  const personaIndex = persona.findIndex((p) => p.id === id);
+  if (personaIndex === -1) {
+    return res.status(404).json({ message: "Persona no encontrada" });
+  }
+  persona[personaIndex] = { ...persona[personaIndex], ...req.body };
+  res.json(persona[personaIndex]);
+});
+
+app.delete("/eliminar/:id", (req, res) => {
+  const id = parseInt(req.params.id);
+  const personaIndex = persona.findIndex((p) => p.id === id);
+  if (personaIndex === -1) {
+    return res.status(404).json({ message: "Persona no encontrada" });
+  }
+  const eliminado = persona.splice(personaIndex, 1);
+  res.json(eliminado[0]);
 });
 
 app.get("/texto", (req, res) => {
