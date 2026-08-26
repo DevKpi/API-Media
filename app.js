@@ -15,66 +15,6 @@ app.get("/", (req, res) => {
   res.json({ message: "Bienvenido a la API de Media!" });
 });
 
-app.get("/persona", (req, res) => {
-  res.json(persona);
-});
-
-app.post("/crear", (req, res) => {
-  persona.push(req.body);
-  const nombres = persona.map((p) => p.nombre);
-  console.log("Nombres en el arreglo:", nombres);
-  res.status(201).json(nombres);
-});
-
-app.put("/actualizar/:id", (req, res) => {
-  const id = parseInt(req.params.id);
-  const personaIndex = persona.findIndex((p) => p.id === id);
-  if (personaIndex === -1) {
-    return res.status(404).json({ message: "Persona no encontrada" });
-  }
-  persona[personaIndex] = { ...persona[personaIndex], ...req.body };
-  res.json(persona[personaIndex]);
-});
-
-app.patch("/patch/:id", (req, res) => {
-  const id = parseInt(req.params.id);
-  const personaIndex = persona.findIndex((p) => p.id === id);
-  if (personaIndex === -1) {
-    return res.status(404).json({ message: "Persona no encontrada" });
-  }
-  persona[personaIndex] = { ...persona[personaIndex], ...req.body };
-  res.json(persona[personaIndex]);
-});
-
-
-app.delete("/eliminar/:id", (req, res) => {
-  const id = parseInt(req.params.id);
-  const personaIndex = persona.findIndex((p) => p.id === id);
-  if (personaIndex === -1) {
-    return res.status(404).json({ message: "Persona no encontrada" });
-  }
-  const eliminado = persona.splice(personaIndex, 1);
-  res.json(eliminado[0]);
-});
-
-app.get("/texto", (req, res) => {
-  res.type("text/plain");
-  res.send("Bienvenido a la API de Media!\n");
-});
-
-app.get("/html", (req, res) => {
-  res.type("text/html");
-  res.send("<h1>Bienvenido a la API de Media!</h1>");
-});
-
-app.get("/test", (req, res) => {
-  res.send("Testeo");
-});
-
-app.use((req, res) => {
-  res.status(404).json({ message: "Ruta no encontrada" });
-});
-
 app.listen(puerto, () => {
   console.log(`Servidor escuchando en http://localhost:${puerto}`);
 });
