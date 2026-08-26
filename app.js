@@ -1,5 +1,7 @@
 import express from "express";
 
+import usuarioRoutes from "./routes/UsuarioRoute.js";
+
 const puerto = 3000;
 
 const app = express();
