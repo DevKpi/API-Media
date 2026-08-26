@@ -8,3 +8,5 @@ router.get("/:id", UsuarioController.obtenerUsuarioPorId);
 router.post("/", UsuarioController.crearUsuario);
 router.put("/:id", UsuarioController.actualizarUsuario);
 router.delete("/:id", UsuarioController.eliminarUsuario);
+
+export default router;

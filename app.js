@@ -11,6 +11,9 @@ app.get("/", (req, res) => {
   res.json({ message: "Bienvenido a la API de Media!" });
 });
 
+app.use("/usuarios", usuarioRoutes);
+
+
 app.listen(puerto, () => {
   console.log(`Servidor escuchando en http://localhost:${puerto}`);
 });
