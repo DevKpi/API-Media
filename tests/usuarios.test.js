@@ -33,12 +33,12 @@ describe("Pruebas de Integración - Endpoints de Usuarios (Vitest + Supertest)",
     expect(res.body.correo).toBeTruthy();
   });
 
-  it("POST /usuarios - Debería crear un nuevo usuario con éxito", async () => {
+  it("POST /usuarios - Debería crear un nuevo usuario con datos válidos (cumpliendo RegEx)", async () => {
     const nuevoUsuario = {
       nombre: "Carlos",
       apellido: "Gomez",
       correo: correoPrueba,
-      contrasena: "clave123",
+      contrasena: "ClaveSegura123",
       rol: "cliente",
     };
 
@@ -54,11 +54,52 @@ describe("Pruebas de Integración - Endpoints de Usuarios (Vitest + Supertest)",
     usuarioCreadoId = res.body.usuario.id;
   });
 
+  // --- Pruebas específicas de RegEx ---
+
+  it("POST /usuarios [RegEx] - Debería fallar si el correo no tiene formato válido (400)", async () => {
+    const res = await request(app)
+      .post("/usuarios")
+      .send({
+        nombre: "Juan",
+        correo: "correo-invalido-sin-arroba",
+        contrasena: "ClaveSegura123",
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toContain("formato del correo electrónico no es válido");
+  });
+
+  it("POST /usuarios [RegEx] - Debería fallar si el nombre contiene números o caracteres inválidos (400)", async () => {
+    const res = await request(app)
+      .post("/usuarios")
+      .send({
+        nombre: "Juan123",
+        correo: "juan@ejemplo.com",
+        contrasena: "ClaveSegura123",
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toContain("solo debe contener letras");
+  });
+
+  it("POST /usuarios [RegEx] - Debería fallar si la contraseña no cumple con la complejidad requerida (400)", async () => {
+    const res = await request(app)
+      .post("/usuarios")
+      .send({
+        nombre: "Juan",
+        correo: "juan_seguro@ejemplo.com",
+        contrasena: "facil", // menos de 8 caracteres, sin mayúscula ni número
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toContain("al menos 8 caracteres");
+  });
+
   it("POST /usuarios - Debería fallar al intentar registrar un correo duplicado (409)", async () => {
     const usuarioDuplicado = {
       nombre: "Duplicado",
       correo: correoPrueba,
-      contrasena: "otraClave",
+      contrasena: "ClaveSegura123",
     };
 
     const res = await request(app)
@@ -82,7 +123,7 @@ describe("Pruebas de Integración - Endpoints de Usuarios (Vitest + Supertest)",
     expect(res.body.message).toBe("Nombre, correo y contraseña son obligatorios");
   });
 
-  it("PUT /usuarios/:id - Debería actualizar los datos del usuario creado", async () => {
+  it("PUT /usuarios/:id - Debería actualizar los datos del usuario creado con valores válidos", async () => {
     expect(usuarioCreadoId).toBeDefined();
 
     const cambios = {
@@ -98,6 +139,17 @@ describe("Pruebas de Integración - Endpoints de Usuarios (Vitest + Supertest)",
     expect(res.body.message).toBe("Usuario actualizado correctamente");
     expect(res.body.usuario.nombre).toBe("Carlos Actualizado");
     expect(res.body.usuario.apellido).toBe("Gomez Perez");
+  });
+
+  it("PUT /usuarios/:id [RegEx] - Debería fallar al actualizar con un formato de correo inválido (400)", async () => {
+    expect(usuarioCreadoId).toBeDefined();
+
+    const res = await request(app)
+      .put(`/usuarios/${usuarioCreadoId}`)
+      .send({ correo: "correo_invalido" });
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toContain("formato del correo electrónico no es válido");
   });
 
   it("DELETE /usuarios/:id - Debería eliminar el usuario creado", async () => {
