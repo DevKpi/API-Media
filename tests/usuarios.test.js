@@ -1,6 +1,6 @@
 import { describe, it, expect, afterAll } from "vitest";
 import request from "supertest";
-import app from "../app.js";
+import app from "../index.js";
 import pool from "../src/config/db.js";
 
 describe("Pruebas de Integración - Endpoints de Usuarios (Vitest + Supertest)", () => {
