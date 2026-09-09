@@ -1,7 +1,7 @@
 import express from "express";
 import dotenv from "dotenv";
 import { probarConexion } from "./src/config/db.js";
-import usuarioRoutes from "./src/routes/UsuarioRoute.js";
+import usuarioRoutes from "./src/routes/Usuario.Route.js";
 
 dotenv.config();
 

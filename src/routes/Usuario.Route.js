@@ -1,9 +1,9 @@
 import express from "express";
-import UsuarioController from "../controllers/UsuarioController.js";
+import UsuarioController from "../controllers/Usuario.Controller.js";
 import {
   validarRegistroUsuario,
   validarActualizacionUsuario,
-} from "../middlewares/validarUsuario.js";
+} from "../middlewares/validar.js";
 
 const router = express.Router();
 
