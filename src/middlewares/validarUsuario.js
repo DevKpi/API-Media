@@ -1,18 +1,18 @@
 // Expresiones regulares (RegEx) para validación de datos de usuario
 
 // Solo letras (con soporte de acentos, diéresis y ñ) y espacios, entre 2 y 50 caracteres
-export const REGEX_NOMBRE = /^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]{2,50}$/;
+const REGEX_NOMBRE = /^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]{2,50}$/;
 
 // Formato de correo electrónico estándar: usuario@dominio.extension
-export const REGEX_CORREO = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+const REGEX_CORREO = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
 // Contraseña segura: mínimo 8 caracteres, al menos una mayúscula, una minúscula y un número
-export const REGEX_CONTRASENA = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+const REGEX_CONTRASENA = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 
 /**
  * Middleware para validar los campos requeridos y formatos RegEx al registrar un usuario
  */
-export const validarRegistroUsuario = (req, res, next) => {
+const validarRegistroUsuario = (req, res, next) => {
   const { nombre, apellido, correo, contrasena } = req.body;
 
   // 1. Campos obligatorios
@@ -57,7 +57,7 @@ export const validarRegistroUsuario = (req, res, next) => {
 /**
  * Middleware para validar formatos RegEx al actualizar un usuario existente
  */
-export const validarActualizacionUsuario = (req, res, next) => {
+const validarActualizacionUsuario = (req, res, next) => {
   const { nombre, apellido, correo } = req.body;
 
   if (nombre === undefined && apellido === undefined && correo === undefined) {
@@ -85,4 +85,13 @@ export const validarActualizacionUsuario = (req, res, next) => {
   }
 
   next();
+};
+
+// Exportación agrupada al final del archivo (Estilo ES Modules)
+export {
+  REGEX_NOMBRE,
+  REGEX_CORREO,
+  REGEX_CONTRASENA,
+  validarRegistroUsuario,
+  validarActualizacionUsuario,
 };
