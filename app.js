@@ -1,6 +1,6 @@
 import express from "express";
 
-import usuarioRoutes from "./routes/UsuarioRoute.js";
+import usuarioRoutes from "./src/routes/UsuarioRoute.js";
 
 const puerto = 3000;
 
