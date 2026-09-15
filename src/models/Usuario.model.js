@@ -36,6 +36,14 @@ class Usuario {
     return rows[0] || null;
   }
 
+  static async obtenerPorNombre(nombre) {
+    const [rows] = await pool.query(
+      "SELECT * FROM usuarios WHERE nombre = ?",
+      [nombre]
+    );
+    return rows[0] || null;
+  }
+
   // Crear un nuevo usuario en la base de datos
   static async crear({ nombre, apellido, correo, contrasena, rol = "cliente" }) {
     const [resultado] = await pool.query(
