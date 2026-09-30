@@ -51,7 +51,7 @@ class UsuarioController {
       }
 
       // Hashear la contraseña con bcrypt
-      const saltRounds = 10;
+      const saltRounds = 12;
       const contrasenaHasheada = await bcrypt.hash(contrasena, saltRounds);
 
       const nuevoId = await Usuario.crear({
