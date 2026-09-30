@@ -1,3 +1,4 @@
+import bcrypt from "bcrypt";
 import Usuario from "../models/Usuario.model.js";
 
 class UsuarioController {
@@ -49,7 +50,17 @@ class UsuarioController {
         return res.status(409).json({ message: "El correo ya se encuentra registrado" });
       }
 
-      const nuevoId = await Usuario.crear({ nombre, apellido, correo, contrasena, rol });
+      // Hashear la contraseña con bcrypt
+      const saltRounds = 10;
+      const contrasenaHasheada = await bcrypt.hash(contrasena, saltRounds);
+
+      const nuevoId = await Usuario.crear({
+        nombre,
+        apellido,
+        correo,
+        contrasena: contrasenaHasheada,
+        rol,
+      });
       const usuarioCreado = await Usuario.obtenerPorId(nuevoId);
 
       res.status(201).json({
