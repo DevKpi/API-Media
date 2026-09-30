@@ -87,6 +87,27 @@ const validarActualizacionUsuario = (req, res, next) => {
   next();
 };
 
+/**
+ * Middleware para validar los campos y formato de correo al iniciar sesión
+ */
+const validarLoginUsuario = (req, res, next) => {
+  const { correo, contrasena } = req.body;
+
+  if (!correo || !contrasena) {
+    return res.status(400).json({
+      message: "Correo y contraseña son obligatorios",
+    });
+  }
+
+  if (!REGEX_CORREO.test(correo.trim())) {
+    return res.status(400).json({
+      message: "El formato del correo electrónico no es válido (ej: usuario@dominio.com)",
+    });
+  }
+
+  next();
+};
+
 // Exportación agrupada al final del archivo (Estilo ES Modules)
 export {
   REGEX_NOMBRE,
@@ -94,4 +115,6 @@ export {
   REGEX_CONTRASENA,
   validarRegistroUsuario,
   validarActualizacionUsuario,
+  validarLoginUsuario,
 };
+

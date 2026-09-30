@@ -3,6 +3,7 @@ import UsuarioController from "../controllers/Usuario.Controller.js";
 import {
   validarRegistroUsuario,
   validarActualizacionUsuario,
+  validarLoginUsuario,
 } from "../middlewares/validar.js";
 
 const router = express.Router();
@@ -10,6 +11,7 @@ const router = express.Router();
 router.get("/", UsuarioController.obtenerUsuarios);
 router.get("/:id", UsuarioController.obtenerUsuarioPorId);
 router.post("/", validarRegistroUsuario, UsuarioController.crearUsuario);
+router.post("/login", validarLoginUsuario, UsuarioController.login);
 router.put("/:id", validarActualizacionUsuario, UsuarioController.actualizarUsuario);
 router.delete("/:id", UsuarioController.eliminarUsuario);
 

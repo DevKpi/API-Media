@@ -54,6 +54,58 @@ describe("Pruebas de Integración - Endpoints de Usuarios (Vitest + Supertest)",
     usuarioCreadoId = res.body.usuario.id;
   });
 
+  // --- Pruebas de Login con bcrypt ---
+
+  it("POST /usuarios/login - Debería iniciar sesión correctamente con credenciales válidas (200)", async () => {
+    const res = await request(app)
+      .post("/usuarios/login")
+      .send({
+        correo: correoPrueba,
+        contrasena: "ClaveSegura123",
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe("Inicio de sesión exitoso");
+    expect(res.body.usuario).toBeDefined();
+    expect(res.body.usuario.correo).toBe(correoPrueba);
+    expect(res.body.usuario.contrasena).toBeUndefined();
+  });
+
+  it("POST /usuarios/login - Debería fallar si la contraseña es incorrecta (401)", async () => {
+    const res = await request(app)
+      .post("/usuarios/login")
+      .send({
+        correo: correoPrueba,
+        contrasena: "ClaveErronea999",
+      });
+
+    expect(res.status).toBe(401);
+    expect(res.body.message).toBe("Credenciales inválidas");
+  });
+
+  it("POST /usuarios/login - Debería fallar si el correo no está registrado (401)", async () => {
+    const res = await request(app)
+      .post("/usuarios/login")
+      .send({
+        correo: "inexistente@ejemplo.com",
+        contrasena: "ClaveSegura123",
+      });
+
+    expect(res.status).toBe(401);
+    expect(res.body.message).toBe("Credenciales inválidas");
+  });
+
+  it("POST /usuarios/login - Debería fallar si faltan datos requeridos (400)", async () => {
+    const res = await request(app)
+      .post("/usuarios/login")
+      .send({
+        correo: correoPrueba,
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toBe("Correo y contraseña son obligatorios");
+  });
+
   // --- Pruebas específicas de RegEx ---
 
   it("POST /usuarios [RegEx] - Debería fallar si el correo no tiene formato válido (400)", async () => {

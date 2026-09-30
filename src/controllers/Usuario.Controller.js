@@ -73,6 +73,38 @@ class UsuarioController {
     }
   }
 
+  // Iniciar sesión
+  static async login(req, res) {
+    try {
+      const { correo, contrasena } = req.body;
+
+      if (!correo || !contrasena) {
+        return res.status(400).json({ message: "Correo y contraseña son obligatorios" });
+      }
+
+      const usuario = await Usuario.obtenerPorCorreo(correo);
+      if (!usuario) {
+        return res.status(401).json({ message: "Credenciales inválidas" });
+      }
+
+      const esValida = await bcrypt.compare(contrasena, usuario.contrasena);
+      if (!esValida) {
+        return res.status(401).json({ message: "Credenciales inválidas" });
+      }
+
+      // No retornar la contraseña en la respuesta
+      const { contrasena: _, ...datosUsuario } = usuario;
+
+      res.status(200).json({
+        message: "Inicio de sesión exitoso",
+        usuario: datosUsuario,
+      });
+    } catch (error) {
+      console.error("Error al iniciar sesión:", error);
+      res.status(500).json({ message: "Error interno del servidor al iniciar sesión" });
+    }
+  }
+
   // Actualizar un usuario existente
   static async actualizarUsuario(req, res) {
     try {
