@@ -10,6 +10,7 @@ Este proyecto consiste en el desarrollo de una API diseñada para funcionar prin
 - **Subtítulos Incrustados:** Cada recurso gráfico viene con texto integrado, permitiendo realizar dinámicas avanzadas de comparación o transcripción.
 - **Estructura Extensible:** Base de datos estructurada con múltiples metadatos indexados (actores, personajes, marcas temporales exactas) para habilitar diversos tipos de validaciones automáticas.
 - **Seguridad en Contraseñas:** Encriptación y hasheo mediante algoritmos robustos con **`bcrypt`** (12 salt rounds) y verificación segura sin exponer credenciales.
+- **Autenticación y Autorización con JWT:** Tokens firmados (JSON Web Tokens) con control de acceso basado en roles (RBAC) y middleware de protección de rutas privadas.
 - **Validaciones Rigurosas:** Validación de datos de entrada mediante expresiones regulares (RegEx) para nombres, correos y contraseñas seguras.
 - **Diseño Arquitectónico Limpio:** Estructurado bajo el patrón arquitectónico Modelo-Vista-Controlador (MVC) en Node.js con Express y ES Modules.
 
@@ -38,15 +39,25 @@ La persistencia de datos almacena los registros de cada escena utilizando un map
 - **MySQL / MariaDB** (XAMPP o servicio local en el puerto `3306`)
 
 ### 2. Configuración de Variables de Entorno
-Copia el archivo `.env.example` a `.env` y configura los accesos a tu base de datos:
+Copia el archivo `.env.example` a `.env` y configura los accesos a tu base de datos y la seguridad JWT:
 ```env
 PORT=3000
+
+# Base de datos MySQL
 DB_HOST=localhost
 DB_USER=root
 DB_PASSWORD=
 DB_NAME=api_media_db
 DB_PORT=3306
+
+# JSON Web Tokens (JWT)
+JWT_SECRET=tu_clave_secreta_super_segura_aqui
+JWT_EXPIRES_IN=2h
 ```
+
+> [!TIP]
+> Puedes generar una clave secreta segura desde la consola ejecutando:
+> `node -e "import('crypto').then(c => console.log(c.randomBytes(48).toString('hex')))"`
 
 ### 3. Base de Datos
 Importa el script SQL `database.sql` en tu gestor MySQL (phpMyAdmin o MySQL Workbench) para crear las tablas y datos iniciales.
@@ -62,7 +73,7 @@ npm run dev
 # Modo producción
 npm start
 
-# Ejecutar suite de pruebas de integración (Vitest + Supertest)
+# Ejecutar suite de pruebas de integración y unitarias (Vitest + Supertest)
 npm test
 ```
 
@@ -77,6 +88,10 @@ npm test
   ```http
   Content-Type: application/json
   Accept: application/json
+  ```
+- **Header de Autenticación para endpoints protegidos:**
+  ```http
+  Authorization: Bearer <token_jwt>
   ```
 
 ---
@@ -100,11 +115,12 @@ Al enviar datos a los endpoints que crean o actualizan usuarios, la API aplica v
 | :--- | :--- | :--- | :--- |
 | `GET` | `/` | Comprobación de estado / Mensaje de bienvenida | Público |
 | `POST` | `/usuarios` | Registro de un nuevo usuario con contraseña hasheada | Público |
-| `POST` | `/usuarios/login` | Autenticación / Inicio de sesión con verificación bcrypt | Público |
-| `GET` | `/usuarios` | Obtener listado de todos los usuarios registrados | Público |
-| `GET` | `/usuarios/:id` | Obtener detalle de un usuario por su ID | Público |
-| `PUT` | `/usuarios/:id` | Actualizar nombre, apellido o correo de un usuario | Público |
-| `DELETE`| `/usuarios/:id` | Eliminar un usuario por su ID | Público |
+| `POST` | `/usuarios/login` | Autenticación de credenciales y emisión de token JWT | Público |
+| `GET` | `/usuarios/perfil` | Obtener perfil del usuario autenticado (extraído del token) | Requiere Token (Bearer) |
+| `GET` | `/usuarios` | Obtener listado de todos los usuarios registrados | Requiere Token (Bearer) |
+| `GET` | `/usuarios/:id` | Obtener detalle de un usuario por su ID | Requiere Token (Bearer) |
+| `PUT` | `/usuarios/:id` | Actualizar nombre, apellido o correo de un usuario | Requiere Token (Bearer) |
+| `DELETE`| `/usuarios/:id` | Eliminar un usuario por su ID | Requiere Token (Solo Admin) |
 
 ---
 
@@ -189,6 +205,7 @@ Autentica las credenciales de un usuario existente comparando la contraseña ing
   ```json
   {
     "message": "Inicio de sesión exitoso",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
     "usuario": {
       "id": 2,
       "nombre": "Carlos",
@@ -213,11 +230,41 @@ Autentica las credenciales de un usuario existente comparando la contraseña ing
 
 ---
 
-### 4. Obtener Todos los Usuarios
-Recupera el listado completo de los usuarios dados de alta en el sistema.
+### 4. Obtener Perfil del Usuario Autenticado
+Retorna los datos del usuario en sesión a partir de la identidad codificada en su token JWT.
+
+- **Método:** `GET`
+- **Endpoint:** `/usuarios/perfil`
+- **Headers:** `Authorization: Bearer <token_jwt>`
+- **Respuesta Exitosa (200 OK):**
+  ```json
+  {
+    "id": 2,
+    "nombre": "Carlos",
+    "apellido": "Gomez",
+    "correo": "carlos.gomez@ejemplo.com",
+    "rol": "cliente",
+    "creado_en": "2026-09-30T22:30:00.000Z"
+  }
+  ```
+- **Respuestas de Error:**
+  - **401 Unauthorized** (Token ausente o expirado):
+    ```json
+    { "message": "Token de autenticación no proporcionado" }
+    ```
+  - **403 Forbidden** (Token manipulado o firma inválida):
+    ```json
+    { "message": "Token inválido o alterado" }
+    ```
+
+---
+
+### 5. Obtener Todos los Usuarios
+Recupera el listado completo de los usuarios dados de alta en el sistema. Requiere token de autenticación.
 
 - **Método:** `GET`
 - **Endpoint:** `/usuarios`
+- **Headers:** `Authorization: Bearer <token_jwt>`
 - **Respuesta Exitosa (200 OK):**
   ```json
   [
@@ -242,11 +289,12 @@ Recupera el listado completo de los usuarios dados de alta en el sistema.
 
 ---
 
-### 5. Obtener Usuario por ID
+### 6. Obtener Usuario por ID
 Recupera los datos de un usuario en específico a través de su identificador numérico.
 
 - **Método:** `GET`
 - **Endpoint:** `/usuarios/:id`
+- **Headers:** `Authorization: Bearer <token_jwt>`
 - **Parámetros de Ruta:**
   - `id` *(número entero obligatorio)*: ID del usuario (ej. `/usuarios/2`).
 - **Respuesta Exitosa (200 OK):**
@@ -265,6 +313,10 @@ Recupera los datos de un usuario en específico a través de su identificador nu
     ```json
     { "message": "El ID proporcionado debe ser un número válido" }
     ```
+  - **401 Unauthorized** (Sin token o expirado):
+    ```json
+    { "message": "Token de autenticación no proporcionado" }
+    ```
   - **404 Not Found** (No existe el ID):
     ```json
     { "message": "Usuario no encontrado" }
@@ -272,11 +324,16 @@ Recupera los datos de un usuario en específico a través de su identificador nu
 
 ---
 
-### 6. Actualizar Usuario
+### 7. Actualizar Usuario
 Modifica los datos generales (`nombre`, `apellido`, `correo`) de un usuario existente. Solo es necesario enviar los campos que se deseen cambiar.
 
 - **Método:** `PUT`
 - **Endpoint:** `/usuarios/:id`
+- **Headers:**
+  ```http
+  Content-Type: application/json
+  Authorization: Bearer <token_jwt>
+  ```
 - **Parámetros de Ruta:**
   - `id` *(número entero obligatorio)*: ID del usuario a modificar.
 - **Cuerpo de la petición (JSON):**
@@ -305,6 +362,10 @@ Modifica los datos generales (`nombre`, `apellido`, `correo`) de un usuario exis
     ```json
     { "message": "Debe enviar al menos un campo para actualizar" }
     ```
+  - **401 Unauthorized** (Sin token o expirado):
+    ```json
+    { "message": "Token de autenticación no proporcionado" }
+    ```
   - **404 Not Found** (Usuario inexistente):
     ```json
     { "message": "Usuario no encontrado" }
@@ -316,11 +377,12 @@ Modifica los datos generales (`nombre`, `apellido`, `correo`) de un usuario exis
 
 ---
 
-### 7. Eliminar Usuario
-Da de baja a un usuario de la base de datos.
+### 8. Eliminar Usuario
+Da de baja a un usuario de la base de datos. Requiere privilegios de administrador (`rol: admin`).
 
 - **Método:** `DELETE`
 - **Endpoint:** `/usuarios/:id`
+- **Headers:** `Authorization: Bearer <token_admin>`
 - **Parámetros de Ruta:**
   - `id` *(número entero obligatorio)*: ID del usuario a eliminar.
 - **Respuesta Exitosa (200 OK):**
@@ -338,6 +400,14 @@ Da de baja a un usuario de la base de datos.
   }
   ```
 - **Respuestas de Error:**
+  - **401 Unauthorized** (Sin token de sesión):
+    ```json
+    { "message": "Token de autenticación no proporcionado" }
+    ```
+  - **403 Forbidden** (El usuario no tiene rol 'admin'):
+    ```json
+    { "message": "Acceso denegado: se requieren privilegios de administrador" }
+    ```
   - **404 Not Found**:
     ```json
     { "message": "Usuario no encontrado" }
@@ -378,7 +448,7 @@ async function registrarUsuario() {
 }
 ```
 
-#### Iniciar Sesión (Login):
+#### Iniciar Sesión (Login) y Obtención de Token:
 ```javascript
 async function iniciarSesion(correo, contrasena) {
   try {
@@ -395,10 +465,34 @@ async function iniciarSesion(correo, contrasena) {
       throw new Error(datos.message);
     }
 
+    console.log("Token JWT:", datos.token);
     console.log("Bienvenido:", datos.usuario.nombre);
-    return datos.usuario;
+    return datos.token;
   } catch (error) {
     console.error("Error de autenticación:", error.message);
+  }
+}
+```
+
+#### Consultar Perfil con Bearer Token:
+```javascript
+async function consultarMiPerfil(token) {
+  try {
+    const respuesta = await fetch("http://localhost:3000/usuarios/perfil", {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+      },
+    });
+
+    const perfil = await respuesta.json();
+    if (!respuesta.ok) {
+      throw new Error(perfil.message);
+    }
+
+    console.log("Perfil del usuario:", perfil);
+  } catch (error) {
+    console.error("Error al obtener perfil:", error.message);
   }
 }
 ```
@@ -414,16 +508,23 @@ curl -X POST http://localhost:3000/usuarios \
   -d "{\"nombre\":\"Mariana\",\"apellido\":\"Lopez\",\"correo\":\"mariana@ejemplo.com\",\"contrasena\":\"Segura2026\"}"
 ```
 
-#### 2. Inicio de Sesión:
+#### 2. Inicio de Sesión (Obtener JWT):
 ```bash
 curl -X POST http://localhost:3000/usuarios/login \
   -H "Content-Type: application/json" \
   -d "{\"correo\":\"mariana@ejemplo.com\",\"contrasena\":\"Segura2026\"}"
 ```
 
-#### 3. Consultar listado:
+#### 3. Consultar Perfil Propio con Token:
 ```bash
-curl -X GET http://localhost:3000/usuarios
+curl -X GET http://localhost:3000/usuarios/perfil \
+  -H "Authorization: Bearer <TOKEN_OBTENIDO>"
+```
+
+#### 4. Consultar listado de usuarios con Token:
+```bash
+curl -X GET http://localhost:3000/usuarios \
+  -H "Authorization: Bearer <TOKEN_OBTENIDO>"
 ```
 
 ---
@@ -433,7 +534,8 @@ curl -X GET http://localhost:3000/usuarios
 - `200 OK`: Operación exitosa (lectura, modificación o eliminación completada).
 - `201 Created`: Recurso creado exitosamente (registro de usuario).
 - `400 Bad Request`: Parámetros faltantes o datos que no cumplen el formato RegEx requerido.
-- `401 Unauthorized`: Fallo de autenticación en login (credenciales inválidas).
+- `401 Unauthorized`: Fallo de autenticación en login o token ausente / expirado en endpoints protegidos.
+- `403 Forbidden`: Acceso denegado (token adulterado, firma inválida o rol insuficiente como en eliminación de usuarios).
 - `404 Not Found`: El recurso o ID especificado no existe.
 - `409 Conflict`: Conflicto de unicidad en la base de datos (ej. correo ya registrado).
 - `500 Internal Server Error`: Error interno imprevisto en el servidor.
