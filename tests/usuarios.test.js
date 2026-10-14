@@ -2,9 +2,12 @@ import { describe, it, expect, afterAll } from "vitest";
 import request from "supertest";
 import app from "../index.js";
 import pool from "../src/config/db.js";
+import { firmarToken } from "../src/utils/jwt.js";
 
-describe("Pruebas de Integración - Endpoints de Usuarios (Vitest + Supertest)", () => {
+describe("Pruebas de Integración - Endpoints de Usuarios y Seguridad JWT (Vitest + Supertest)", () => {
   let usuarioCreadoId = null;
+  let tokenCliente = null;
+  let tokenAdmin = null;
   const timestamp = Date.now();
   const correoPrueba = `test_${timestamp}@ejemplo.com`;
 
@@ -13,27 +16,15 @@ describe("Pruebas de Integración - Endpoints de Usuarios (Vitest + Supertest)",
     await pool.end();
   });
 
-  it("GET / - Debería retornar el mensaje de bienvenida", async () => {
+  // --- 1. Endpoints Públicos ---
+
+  it("GET / - Debería retornar el mensaje de bienvenida sin requerir autenticación", async () => {
     const res = await request(app).get("/");
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ message: "Bienvenido a la API de Media!" });
   });
 
-  it("GET /usuarios - Debería obtener el listado de usuarios", async () => {
-    const res = await request(app).get("/usuarios");
-    expect(res.status).toBe(200);
-    expect(Array.isArray(res.body)).toBe(true);
-    expect(res.body.length).toBeGreaterThanOrEqual(1);
-  });
-
-  it("GET /usuarios/1 - Debería obtener el usuario administrador por ID", async () => {
-    const res = await request(app).get("/usuarios/1");
-    expect(res.status).toBe(200);
-    expect(res.body.id).toBe(1);
-    expect(res.body.correo).toBeTruthy();
-  });
-
-  it("POST /usuarios - Debería crear un nuevo usuario con datos válidos (cumpliendo RegEx)", async () => {
+  it("POST /usuarios - Debería registrar un nuevo usuario con datos válidos (cumpliendo RegEx)", async () => {
     const nuevoUsuario = {
       nombre: "Carlos",
       apellido: "Gomez",
@@ -52,11 +43,18 @@ describe("Pruebas de Integración - Endpoints de Usuarios (Vitest + Supertest)",
     expect(res.body.usuario.correo).toBe(correoPrueba);
 
     usuarioCreadoId = res.body.usuario.id;
+
+    // Generar un token de administrador firmado para pruebas de autorización
+    tokenAdmin = firmarToken({
+      id: 9999,
+      correo: "admin@apimedia.com",
+      rol: "admin",
+    });
   });
 
-  // --- Pruebas de Login con bcrypt ---
+  // --- 2. Pruebas de Login y Emisión de Token JWT ---
 
-  it("POST /usuarios/login - Debería iniciar sesión correctamente con credenciales válidas (200)", async () => {
+  it("POST /usuarios/login - Debería iniciar sesión y retornar un JWT válido junto a los datos del usuario (200)", async () => {
     const res = await request(app)
       .post("/usuarios/login")
       .send({
@@ -66,9 +64,14 @@ describe("Pruebas de Integración - Endpoints de Usuarios (Vitest + Supertest)",
 
     expect(res.status).toBe(200);
     expect(res.body.message).toBe("Inicio de sesión exitoso");
+    expect(res.body.token).toBeDefined();
+    expect(typeof res.body.token).toBe("string");
     expect(res.body.usuario).toBeDefined();
     expect(res.body.usuario.correo).toBe(correoPrueba);
     expect(res.body.usuario.contrasena).toBeUndefined();
+
+    // Guardar token emitido para pruebas subsecuentes
+    tokenCliente = res.body.token;
   });
 
   it("POST /usuarios/login - Debería fallar si la contraseña es incorrecta (401)", async () => {
@@ -106,7 +109,59 @@ describe("Pruebas de Integración - Endpoints de Usuarios (Vitest + Supertest)",
     expect(res.body.message).toBe("Correo y contraseña son obligatorios");
   });
 
-  // --- Pruebas específicas de RegEx ---
+  // --- 3. Pruebas de Protección de Rutas (Middleware verificarAuth) ---
+
+  it("GET /usuarios - Debería denegar acceso con 401 si no se envía token de autenticación", async () => {
+    const res = await request(app).get("/usuarios");
+    expect(res.status).toBe(401);
+    expect(res.body.message).toContain("Token de autenticación no proporcionado");
+  });
+
+  it("GET /usuarios - Debería denegar acceso con 401 si el formato del header no es 'Bearer <token>'", async () => {
+    const res = await request(app)
+      .get("/usuarios")
+      .set("Authorization", "TokenInvalidoSinBearer");
+    expect(res.status).toBe(401);
+    expect(res.body.message).toContain("Formato de token inválido");
+  });
+
+  it("GET /usuarios - Debería rechazar con 403 un token alterado o inválido", async () => {
+    const res = await request(app)
+      .get("/usuarios")
+      .set("Authorization", "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.tokenfalso.firmafalsa");
+    expect(res.status).toBe(403);
+    expect(res.body.message).toContain("Token inválido o alterado");
+  });
+
+  it("GET /usuarios - Debería autorizar y obtener el listado con un token válido (200)", async () => {
+    const res = await request(app)
+      .get("/usuarios")
+      .set("Authorization", `Bearer ${tokenCliente}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("GET /usuarios/perfil - Debería retornar el perfil del usuario autenticado a partir de su JWT (200)", async () => {
+    const res = await request(app)
+      .get("/usuarios/perfil")
+      .set("Authorization", `Bearer ${tokenCliente}`);
+    expect(res.status).toBe(200);
+    expect(res.body.id).toBe(usuarioCreadoId);
+    expect(res.body.correo).toBe(correoPrueba);
+    expect(res.body.contrasena).toBeUndefined();
+  });
+
+  it("GET /usuarios/:id - Debería obtener el usuario por ID con token válido (200)", async () => {
+    const res = await request(app)
+      .get(`/usuarios/${usuarioCreadoId}`)
+      .set("Authorization", `Bearer ${tokenCliente}`);
+    expect(res.status).toBe(200);
+    expect(res.body.id).toBe(usuarioCreadoId);
+    expect(res.body.correo).toBe(correoPrueba);
+  });
+
+  // --- 4. Pruebas de RegEx y Validaciones de Entrada ---
 
   it("POST /usuarios [RegEx] - Debería fallar si el correo no tiene formato válido (400)", async () => {
     const res = await request(app)
@@ -175,7 +230,17 @@ describe("Pruebas de Integración - Endpoints de Usuarios (Vitest + Supertest)",
     expect(res.body.message).toBe("Nombre, correo y contraseña son obligatorios");
   });
 
-  it("PUT /usuarios/:id - Debería actualizar los datos del usuario creado con valores válidos", async () => {
+  // --- 5. Pruebas de Actualización (PUT) ---
+
+  it("PUT /usuarios/:id - Debería denegar actualización sin token (401)", async () => {
+    const res = await request(app)
+      .put(`/usuarios/${usuarioCreadoId}`)
+      .send({ nombre: "Intento Sin Token" });
+
+    expect(res.status).toBe(401);
+  });
+
+  it("PUT /usuarios/:id - Debería actualizar los datos del usuario con token válido (200)", async () => {
     expect(usuarioCreadoId).toBeDefined();
 
     const cambios = {
@@ -185,6 +250,7 @@ describe("Pruebas de Integración - Endpoints de Usuarios (Vitest + Supertest)",
 
     const res = await request(app)
       .put(`/usuarios/${usuarioCreadoId}`)
+      .set("Authorization", `Bearer ${tokenCliente}`)
       .send(cambios);
 
     expect(res.status).toBe(200);
@@ -198,16 +264,32 @@ describe("Pruebas de Integración - Endpoints de Usuarios (Vitest + Supertest)",
 
     const res = await request(app)
       .put(`/usuarios/${usuarioCreadoId}`)
+      .set("Authorization", `Bearer ${tokenCliente}`)
       .send({ correo: "correo_invalido" });
 
     expect(res.status).toBe(400);
     expect(res.body.message).toContain("formato del correo electrónico no es válido");
   });
 
-  it("DELETE /usuarios/:id - Debería eliminar el usuario creado", async () => {
+  // --- 6. Pruebas de Autorización y Roles (DELETE / soloAdmin) ---
+
+  it("DELETE /usuarios/:id - Debería rechazar la eliminación si el usuario no tiene rol 'admin' (403)", async () => {
     expect(usuarioCreadoId).toBeDefined();
 
-    const res = await request(app).delete(`/usuarios/${usuarioCreadoId}`);
+    const res = await request(app)
+      .delete(`/usuarios/${usuarioCreadoId}`)
+      .set("Authorization", `Bearer ${tokenCliente}`); // Rol: cliente
+
+    expect(res.status).toBe(403);
+    expect(res.body.message).toContain("se requieren privilegios de administrador");
+  });
+
+  it("DELETE /usuarios/:id - Debería permitir la eliminación cuando el usuario tiene rol 'admin' (200)", async () => {
+    expect(usuarioCreadoId).toBeDefined();
+
+    const res = await request(app)
+      .delete(`/usuarios/${usuarioCreadoId}`)
+      .set("Authorization", `Bearer ${tokenAdmin}`); // Rol: admin
 
     expect(res.status).toBe(200);
     expect(res.body.message).toBe("Usuario eliminado correctamente");
@@ -215,7 +297,9 @@ describe("Pruebas de Integración - Endpoints de Usuarios (Vitest + Supertest)",
   });
 
   it("GET /usuarios/:id - Debería retornar 404 para el usuario recién eliminado", async () => {
-    const res = await request(app).get(`/usuarios/${usuarioCreadoId}`);
+    const res = await request(app)
+      .get(`/usuarios/${usuarioCreadoId}`)
+      .set("Authorization", `Bearer ${tokenAdmin}`);
 
     expect(res.status).toBe(404);
     expect(res.body.message).toBe("Usuario no encontrado");
