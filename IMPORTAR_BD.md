@@ -61,6 +61,19 @@ Si prefieres la terminal:
 
 ---
 
+## 🔑 Credenciales de Prueba Precargadas (Seed Data)
+
+Para probar el inicio de sesión (`/usuarios/login`) y la generación de tokens JWT, puedes utilizar cualquiera de estos usuarios cargados con contraseñas seguras hasheadas con bcrypt:
+
+| Usuario | Correo Electrónico | Contraseña | Rol | Permisos |
+| :--- | :--- | :--- | :---: | :--- |
+| **Admin Sistema** | `admin@apimedia.com` | `Admin123*` | `admin` | Acceso total (incluye endpoints exclusivos como `DELETE`). |
+| **Leonardo Eckert** | `leonardo@ejemplo.com` | `Cliente123*` | `cliente` | Acceso a endpoints protegidos estándar (`/perfil`, `GET`, `PUT`). |
+| **Carlos Gomez** | `carlos.gomez@ejemplo.com` | `ClaveSegura123` | `cliente` | Acceso a endpoints protegidos estándar. |
+| **Mariana Lopez** | `mariana.lopez@ejemplo.com` | `Segura2026*` | `cliente` | Acceso a endpoints protegidos estándar. |
+
+---
+
 ## 🔍 Consultas de Prueba Rápidas
 
 Una vez importada la base de datos, puedes ir a la pestaña **SQL** dentro de `api_media_db` en phpMyAdmin y probar:

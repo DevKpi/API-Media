@@ -60,7 +60,15 @@ JWT_EXPIRES_IN=2h
 > `node -e "import('crypto').then(c => console.log(c.randomBytes(48).toString('hex')))"`
 
 ### 3. Base de Datos
-Importa el script SQL `database.sql` en tu gestor MySQL (phpMyAdmin o MySQL Workbench) para crear las tablas y datos iniciales.
+Importa el script SQL `database.sql` (para crear base de datos, tablas y datos iniciales) o `seed_data.sql` (para recarga rápida y limpia de datos de prueba) en tu gestor MySQL (phpMyAdmin o MySQL Workbench).
+
+#### 🔑 Credenciales de Prueba Precargadas:
+| Usuario / Rol | Correo Electrónico | Contraseña | Permisos |
+| :--- | :--- | :--- | :--- |
+| **Admin Sistema** | `admin@apimedia.com` | `Admin123*` | Control total (incluye `DELETE /usuarios/:id`) |
+| **Leonardo Eckert** | `leonardo@ejemplo.com` | `Cliente123*` | Rutas protegidas estándar (`/perfil`, lectura, actualización) |
+| **Carlos Gomez** | `carlos.gomez@ejemplo.com` | `ClaveSegura123` | Rutas protegidas estándar |
+| **Mariana Lopez** | `mariana.lopez@ejemplo.com` | `Segura2026*` | Rutas protegidas estándar |
 
 ### 4. Instalación de dependencias y ejecución
 ```bash
