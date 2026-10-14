@@ -1,5 +1,6 @@
 import bcrypt from "bcrypt";
 import Usuario from "../models/Usuario.model.js";
+import { firmarToken } from "../utils/jwt.js";
 
 class UsuarioController {
   // Obtener todos los usuarios
@@ -95,13 +96,37 @@ class UsuarioController {
       // No retornar la contraseña en la respuesta
       const { contrasena: _, ...datosUsuario } = usuario;
 
+      // Generar token JWT con la información básica del usuario
+      const payload = {
+        id: usuario.id,
+        correo: usuario.correo,
+        rol: usuario.rol || "cliente",
+      };
+      const token = firmarToken(payload);
+
       res.status(200).json({
         message: "Inicio de sesión exitoso",
+        token,
         usuario: datosUsuario,
       });
     } catch (error) {
       console.error("Error al iniciar sesión:", error);
       res.status(500).json({ message: "Error interno del servidor al iniciar sesión" });
+    }
+  }
+
+  // Obtener perfil del usuario autenticado a través del token
+  static async obtenerPerfil(req, res) {
+    try {
+      const usuario = await Usuario.obtenerPorId(req.usuario.id);
+      if (!usuario) {
+        return res.status(404).json({ message: "Usuario no encontrado" });
+      }
+
+      res.status(200).json(usuario);
+    } catch (error) {
+      console.error("Error al obtener perfil:", error);
+      res.status(500).json({ message: "Error interno del servidor al obtener el perfil" });
     }
   }
 
