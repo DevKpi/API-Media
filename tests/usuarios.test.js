@@ -230,6 +230,20 @@ describe("Pruebas de Integración - Endpoints de Usuarios y Seguridad JWT (Vites
     expect(res.body.message).toBe("Nombre, correo y contraseña son obligatorios");
   });
 
+  it("POST /usuarios - Debería fallar si se proporciona un rol inválido (400)", async () => {
+    const res = await request(app)
+      .post("/usuarios")
+      .send({
+        nombre: "Test Rol",
+        correo: "test_rol@ejemplo.com",
+        contrasena: "ClaveSegura123",
+        rol: "superadmin", // rol inválido
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toBe("El rol proporcionado no es válido. Debe ser 'cliente' o 'admin'");
+  });
+
   // --- 5. Pruebas de Actualización (PUT) ---
 
   it("PUT /usuarios/:id - Debería denegar actualización sin token (401)", async () => {

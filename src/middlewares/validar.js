@@ -13,7 +13,7 @@ const REGEX_CONTRASENA = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
  * Middleware para validar los campos requeridos y formatos RegEx al registrar un usuario
  */
 const validarRegistroUsuario = (req, res, next) => {
-  const { nombre, apellido, correo, contrasena } = req.body;
+  const { nombre, apellido, correo, contrasena, rol } = req.body;
 
   // 1. Campos obligatorios
   if (!nombre || !correo || !contrasena) {
@@ -48,6 +48,13 @@ const validarRegistroUsuario = (req, res, next) => {
     return res.status(400).json({
       message:
         "La contraseña debe tener al menos 8 caracteres, incluir al menos una letra mayúscula, una minúscula y un número",
+    });
+  }
+
+  // 6. Validación de rol (si se proporciona)
+  if (rol !== undefined && !["cliente", "admin"].includes(rol)) {
+    return res.status(400).json({
+      message: "El rol proporcionado no es válido. Debe ser 'cliente' o 'admin'",
     });
   }
 
