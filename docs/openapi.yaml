@@ -261,6 +261,213 @@ paths:
         '404':
           $ref: '#/components/responses/NotFoundError'
 
+  /captcha/nuevo:
+    get:
+      summary: Generar nuevo desafío CAPTCHA
+      description: Selecciona una escena aleatoria activa y emite un token efímero con URL de imagen.
+      parameters:
+        - name: dificultad
+          in: query
+          required: false
+          description: Nivel de dificultad de la escena
+          schema:
+            type: string
+            enum: [facil, medio, dificil]
+      responses:
+        '201':
+          description: Desafío generado exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Desafío CAPTCHA generado con éxito
+                  desafio_id:
+                    type: string
+                    format: uuid
+                  token:
+                    type: string
+                    example: tok_9f8a7b6c5d4e3f2a1b0c...
+                  imagen_url:
+                    type: string
+                    format: uri
+                    example: http://localhost:3000/imagenes/matrix_pastilla_azul_roja.jpg
+                  dificultad:
+                    type: string
+                    example: medio
+                  obra:
+                    type: string
+                    example: The Matrix
+                  expira_en:
+                    type: string
+                    format: date-time
+                  instrucciones:
+                    type: string
+
+  /captcha/validar:
+    post:
+      summary: Validar desafío CAPTCHA
+      description: Compara la transcripción enviada por el usuario con el subtítulo esperado aplicando tolerancia semántica.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - token
+                - respuesta
+              properties:
+                token:
+                  type: string
+                  example: tok_9f8a7b6c5d4e3f2a1b0c...
+                respuesta:
+                  type: string
+                  example: Toma la pastilla azul y el fin de la historia...
+      responses:
+        '200':
+          description: Verificación humana exitosa
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valido:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Verificación humana exitosa
+                  desafio_id:
+                    type: string
+                  token:
+                    type: string
+        '400':
+          description: Respuesta incorrecta, desafío expirado o resuelto
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valido:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: La respuesta no coincide con el subtítulo de la escena. Intente nuevamente.
+        '404':
+          description: Desafío no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MensajeError'
+
+  /escenas:
+    get:
+      summary: Listar escenas audiovisuales
+      description: Retorna el catálogo de escenas con subtítulos incrustados y metadatos de actores y obras.
+      parameters:
+        - name: obra_id
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: dificultad
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [facil, medio, dificil]
+      responses:
+        '200':
+          description: Catálogo de escenas obtenido
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    imagen_de_escena:
+                      type: string
+                    imagen_url:
+                      type: string
+                    subtitulo_texto:
+                      type: string
+                    minuto_escena:
+                      type: number
+                    dificultad:
+                      type: string
+                    obra_titulo:
+                      type: string
+                    actor_nombre:
+                      type: string
+                    personaje_nombre:
+                      type: string
+
+  /escenas/{id}:
+    get:
+      summary: Obtener escena por ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Detalle de escena
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /obras:
+    get:
+      summary: Listar obras audiovisuales
+      description: Retorna las películas, series y anime catalogados con la cantidad de escenas disponibles.
+      responses:
+        '200':
+          description: Catálogo de producciones
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    titulo:
+                      type: string
+                    tipo:
+                      type: string
+                    anio_estreno:
+                      type: integer
+                    total_escenas:
+                      type: integer
+
+  /obras/{id}:
+    get:
+      summary: Obtener obra por ID con sus escenas
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Obra con escenas asociadas
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
 components:
   securitySchemes:
     bearerAuth:

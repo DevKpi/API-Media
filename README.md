@@ -3,15 +3,16 @@
 [![Node.js](https://img.shields.io/badge/Node.js-18%2B-green.svg)](https://nodejs.org/)
 [![Express](https://img.shields.io/badge/Express-5.x-blue.svg)](https://expressjs.com/)
 [![MySQL](https://img.shields.io/badge/MySQL-8.0%2B-orange.svg)](https://www.mysql.com/)
-[![Tests](https://img.shields.io/badge/Tests-Vitest%20%7C%20Supertest-yellow.svg)](https://vitest.dev/)
-[![OpenAPI](https://img.shields.io/badge/OpenAPI-3.0.3-brightgreen.svg)](docs/openapi.yaml)
+[![Tests](https://img.shields.io/badge/Tests-47%20passed-brightgreen.svg)](https://vitest.dev/)
+[![OpenAPI](https://img.shields.io/badge/OpenAPI-3.0.3-blue.svg)](docs/openapi.yaml)
 
-Este proyecto consiste en el desarrollo de una API diseñada para funcionar principalmente como un sistema de **CAPTCHA cultural basado en texto y reconocimiento audiovisual**. La API se encarga de servir escenas icónicas de series, películas y anime con subtítulos incrustados en la imagen, permitiendo validar la interacción humana mediante el contexto semántico de los elementos visuales y textuales expuestos.
+Este proyecto consiste en el desarrollo de una API diseñada para funcionar como un sistema de **CAPTCHA cultural basado en texto y reconocimiento audiovisual**. La API sirve escenas icónicas de series, películas y anime con subtítulos incrustados en la imagen, permitiendo validar la interacción humana mediante el contexto semántico de los elementos visuales y textuales expuestos.
 
 > [!NOTE]
-> **Estado y Fases del Proyecto:**
-> - **Fase 1 (Activa y en Producción):** Módulo completo de **Gestión de Usuarios, Autenticación y Autorización RBAC** (Tokens JWT, encriptación bcrypt a 12 rondas, validaciones RegEx y endpoints CRUD).
-> - **Fase 2 (En desarrollo):** Motor de generación y verificación de desafíos CAPTCHA (`/captcha`, `/escenas`, `/obras`). Las tablas de la base de datos ya están creadas y sembradas en `database.sql`.
+> **Estado del Proyecto:**
+> - **Módulo de Usuarios y Autenticación RBAC (Activo):** Tokens JWT, encriptación bcrypt a 12 rondas, validaciones RegEx y endpoints CRUD.
+> - **Módulo de Escenas y Catálogo Multimedia (Activo):** Servicio de archivos estáticos en `/imagenes`, consulta de producciones (`/obras`) y escenas con subtítulos incrustados (`/escenas`).
+> - **Motor CAPTCHA Cultural (Activo):** Generación de retos efímeros con tokens (`/captcha/nuevo`) y validación semántica con tolerancia a tildes, signos y faltas leves (`/captcha/validar`).
 >
 > 📖 Para una guía de arquitectura y referencia exhaustiva, consulta la [Documentación Técnica Detallada en docs/documentacion.md](docs/documentacion.md) y la especificación [OpenAPI 3.0 en docs/openapi.yaml](docs/openapi.yaml).
 
@@ -191,6 +192,7 @@ Al enviar datos a los endpoints que crean o modifican usuarios, el middleware [v
 
 ## 🔌 Resumen de Endpoints
 
+### 👤 Módulo de Usuarios y Autenticación
 | Método | Endpoint | Descripción | Acceso |
 | :--- | :--- | :--- | :--- |
 | `GET` | `/` | Comprobación de estado y bienvenida | Público |
@@ -201,6 +203,21 @@ Al enviar datos a los endpoints que crean o modifican usuarios, el middleware [v
 | `GET` | `/usuarios/:id` | Obtener detalle de un usuario por su ID | Requiere Token (Bearer) |
 | `PUT` | `/usuarios/:id` | Actualizar nombre, apellido o correo de un usuario | Requiere Token (Bearer) |
 | `DELETE`| `/usuarios/:id` | Eliminar un usuario por su ID | Requiere Token (Solo Admin) |
+
+### 🧩 Módulo del Motor CAPTCHA Cultural
+| Método | Endpoint | Descripción | Acceso |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/captcha/nuevo` | Genera un desafío efímero con imagen y token único | Público |
+| `POST` | `/captcha/validar` | Valida la transcripción enviada por el usuario | Público |
+
+### 🎬 Módulo de Catálogo Audiovisual y Archivos Estáticos
+| Método | Endpoint | Descripción | Acceso |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/escenas` | Listado de escenas con subtítulos y filtros (`?obra_id`, `?dificultad`) | Público |
+| `GET` | `/escenas/:id` | Detalle completo de una escena por su ID | Público |
+| `GET` | `/obras` | Listado de películas, series y anime con cantidad de escenas | Público |
+| `GET` | `/obras/:id` | Detalle de una obra con sus escenas asociadas | Público |
+| `GET` | `/imagenes/:archivo` | Servidor de archivos estáticos para imágenes de escenas | Público |
 
 ---
 
@@ -470,6 +487,115 @@ Da de baja a un usuario de la base de datos. Requiere privilegios estrictos de a
     ```json
     { "message": "Usuario no encontrado" }
     ```
+
+---
+
+### 9. Generar Desafío CAPTCHA
+Selecciona aleatoriamente una escena activa de la base de datos, crea un reto efímero con vigencia de 10 minutos en `desafios_captcha` y entrega al cliente la URL de la imagen y un token seguro. Por razones estrictas de seguridad, el texto del subtítulo **nunca** se envía al frontend.
+
+- **Método:** `GET`
+- **Endpoint:** `/captcha/nuevo`
+- **Parámetros de Consulta (Opcionales):**
+  - `dificultad`: Filtrar por nivel (`facil`, `medio`, `dificil`).
+- **Respuesta Exitosa (201 Created):**
+  ```json
+  {
+    "message": "Desafío CAPTCHA generado con éxito",
+    "desafio_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "token": "tok_9f8a7b6c5d4e3f2a1b0c8d7e6f5a4b3c",
+    "imagen_url": "http://localhost:3000/imagenes/matrix_pastilla_azul_roja.jpg",
+    "dificultad": "medio",
+    "obra": "The Matrix",
+    "expira_en": "2026-10-20T22:50:00.000Z",
+    "instrucciones": "Escribe el texto del subtítulo visible en la imagen para validar que eres humano."
+  }
+  ```
+
+---
+
+### 10. Validar Desafío CAPTCHA
+Recibe el token del reto y la transcripción ingresada por el usuario. Aplica normalización de texto (eliminando acentos, mayúsculas, signos de puntuación y espacios extras) junto con un algoritmo de similitud tolerante a pequeños errores tipográficos (distancia de Levenshtein >= 85%). Si la respuesta es correcta, marca el reto como `resuelto`.
+
+- **Método:** `POST`
+- **Endpoint:** `/captcha/validar`
+- **Headers:** `Content-Type: application/json`
+- **Cuerpo de la Petición (JSON):**
+  ```json
+  {
+    "token": "tok_9f8a7b6c5d4e3f2a1b0c8d7e6f5a4b3c",
+    "respuesta": "toma la pastilla azul y el fin de la historia"
+  }
+  ```
+- **Respuesta Exitosa (200 OK):**
+  ```json
+  {
+    "valido": true,
+    "message": "Verificación humana exitosa",
+    "desafio_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "token": "tok_9f8a7b6c5d4e3f2a1b0c8d7e6f5a4b3c"
+  }
+  ```
+- **Respuestas de Error:**
+  - **400 Bad Request** (Respuesta incorrecta):
+    ```json
+    {
+      "valido": false,
+      "message": "La respuesta no coincide con el subtítulo de la escena. Intente nuevamente."
+    }
+    ```
+  - **400 Bad Request** (Desafío expirado o ya resuelto):
+    ```json
+    { "valido": false, "message": "Este desafío ya ha sido resuelto anteriormente" }
+    ```
+  - **404 Not Found** (Token inexistente o inválido):
+    ```json
+    { "message": "Desafío no encontrado o token inválido" }
+    ```
+
+---
+
+### 11. Listar Catálogo de Escenas
+Recupera el listado de escenas audiovisuales con sus respectivos actores, personajes y obras.
+
+- **Método:** `GET`
+- **Endpoint:** `/escenas`
+- **Parámetros de Consulta (Opcionales):** `?obra_id=1&dificultad=facil`
+- **Respuesta Exitosa (200 OK):**
+  ```json
+  [
+    {
+      "id": 1,
+      "imagen_de_escena": "matrix_pastilla_azul_roja.jpg",
+      "imagen_url": "http://localhost:3000/imagenes/matrix_pastilla_azul_roja.jpg",
+      "subtitulo_texto": "Toma la pastilla azul y el fin de la historia...",
+      "minuto_escena": 28.45,
+      "dificultad": "medio",
+      "obra_titulo": "The Matrix",
+      "actor_nombre": "Laurence Fishburne",
+      "personaje_nombre": "Morpheus"
+    }
+  ]
+  ```
+
+---
+
+### 12. Listar Obras Audiovisuales
+Obtiene la lista de películas, series y animes registrados, incluyendo el total de escenas asociadas.
+
+- **Método:** `GET`
+- **Endpoint:** `/obras`
+- **Respuesta Exitosa (200 OK):**
+  ```json
+  [
+    {
+      "id": 1,
+      "titulo": "The Matrix",
+      "tipo": "pelicula",
+      "anio_estreno": 1999,
+      "total_escenas": 1
+    }
+  ]
+  ```
 
 ---
 

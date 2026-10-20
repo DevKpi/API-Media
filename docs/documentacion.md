@@ -651,6 +651,144 @@ Elimina permanentemente un usuario de la base de datos. Requiere privilegios est
 
 ---
 
+### 6.9. GET /captcha/nuevo - Generación de Desafío CAPTCHA
+Selecciona aleatoriamente una escena audiovisual activa y genera un desafío efímero con vigencia de 10 minutos en la tabla `desafios_captcha`. Retorna al cliente la URL de la escena con subtítulos incrustados y un token único de verificación sin exponer el texto del subtítulo.
+
+* **Método:** `GET`
+* **URL:** `/captcha/nuevo`
+* **Acceso:** Público
+* **Parámetros de Consulta (Opcionales):**
+  * `dificultad` (`facil`, `medio`, `dificil`): Filtra el reto por nivel de complejidad.
+* **Respuesta Exitosa (`201 Created`):**
+  ```json
+  {
+    "message": "Desafío CAPTCHA generado con éxito",
+    "desafio_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "token": "tok_9f8a7b6c5d4e3f2a1b0c8d7e6f5a4b3c",
+    "imagen_url": "http://localhost:3000/imagenes/matrix_pastilla_azul_roja.jpg",
+    "dificultad": "medio",
+    "obra": "The Matrix",
+    "expira_en": "2026-10-20T23:00:00.000Z",
+    "instrucciones": "Escribe el texto del subtítulo visible en la imagen para validar que eres humano."
+  }
+  ```
+
+---
+
+### 6.10. POST /captcha/validar - Validación de Desafío CAPTCHA
+Recibe el token público y la transcripción provista por el usuario. Aplica normalización de caracteres (remueve tildes, mayúsculas, signos tipográficos y espacios redundantes) y ejecuta un cálculo de similitud mediante la distancia de Levenshtein (umbral de aceptación >= 85%) para tolerar deslices ortográficos leves.
+
+* **Método:** `POST`
+* **URL:** `/captcha/validar`
+* **Acceso:** Público
+* **Headers:** `Content-Type: application/json`
+* **Cuerpo de la Petición (JSON):**
+  ```json
+  {
+    "token": "tok_9f8a7b6c5d4e3f2a1b0c8d7e6f5a4b3c",
+    "respuesta": "toma la pastilla azul y el fin de la historia"
+  }
+  ```
+* **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "valido": true,
+    "message": "Verificación humana exitosa",
+    "desafio_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "token": "tok_9f8a7b6c5d4e3f2a1b0c8d7e6f5a4b3c"
+  }
+  ```
+* **Respuestas de Error:**
+  * **`400 Bad Request`** - Respuesta errónea o discrepante:
+    ```json
+    {
+      "valido": false,
+      "message": "La respuesta no coincide con el subtítulo de la escena. Intente nuevamente."
+    }
+    ```
+  * **`400 Bad Request`** - Desafío ya resuelto previamente:
+    ```json
+    { "valido": false, "message": "Este desafío ya ha sido resuelto anteriormente" }
+    ```
+  * **`400 Bad Request`** - Desafío vencido por tiempo:
+    ```json
+    { "valido": false, "message": "El desafío ha expirado. Solicite un nuevo desafío." }
+    ```
+  * **`404 Not Found`** - Token inexistente:
+    ```json
+    { "message": "Desafío no encontrado o token inválido" }
+    ```
+
+---
+
+### 6.11. GET /escenas - Listado del Catálogo de Escenas
+Recupera el listado completo de escenas cinematográficas y televisivas con sus actores, personajes y URL pública de la imagen.
+
+* **Método:** `GET`
+* **URL:** `/escenas`
+* **Acceso:** Público
+* **Parámetros de Consulta (Opcionales):**
+  * `obra_id` (`integer`): Filtra escenas pertenecientes a una obra concreta.
+  * `dificultad` (`facil`, `medio`, `dificil`): Filtra por dificultad.
+* **Respuesta Exitosa (`200 OK`):**
+  ```json
+  [
+    {
+      "id": 1,
+      "imagen_de_escena": "matrix_pastilla_azul_roja.jpg",
+      "imagen_url": "http://localhost:3000/imagenes/matrix_pastilla_azul_roja.jpg",
+      "subtitulo_texto": "Toma la pastilla azul y el fin de la historia...",
+      "minuto_escena": 28.45,
+      "dificultad": "medio",
+      "obra_titulo": "The Matrix",
+      "actor_nombre": "Laurence Fishburne",
+      "personaje_nombre": "Morpheus"
+    }
+  ]
+  ```
+
+---
+
+### 6.12. GET /escenas/:id - Detalle de Escena por ID
+* **Método:** `GET`
+* **URL:** `/escenas/:id`
+* **Acceso:** Público
+* **Respuesta Exitosa (`200 OK`):** Retorna el objeto de la escena individual con su `imagen_url`.
+
+---
+
+### 6.13. GET /obras - Catálogo de Obras Audiovisuales
+* **Método:** `GET`
+* **URL:** `/obras`
+* **Acceso:** Público
+* **Respuesta Exitosa (`200 OK`):**
+  ```json
+  [
+    {
+      "id": 1,
+      "titulo": "The Matrix",
+      "tipo": "pelicula",
+      "anio_estreno": 1999,
+      "total_escenas": 1
+    }
+  ]
+  ```
+
+---
+
+### 6.14. GET /obras/:id - Detalle de Obra con Escenas Asociadas
+* **Método:** `GET`
+* **URL:** `/obras/:id`
+* **Acceso:** Público
+* **Respuesta Exitosa (`200 OK`):** Objeto de la obra con el arreglo `escenas` anidado.
+
+---
+
+### 6.15. GET /imagenes/:archivo - Servicio de Archivos Estáticos
+Servidor de archivos estáticos montado sobre `public/imagenes/`. Entrega directamente la imagen JPEG/PNG con encabezado `Content-Type: image/jpeg`.
+
+---
+
 ## 🚦 7. Códigos de Estado y Manejo de Errores
 
 La API sigue rigurosamente las convenciones de la especificación RFC 9110 para códigos de estado HTTP:
@@ -670,23 +808,23 @@ La API sigue rigurosamente las convenciones de la especificación RFC 9110 para 
 
 ## 🧪 8. Suite de Pruebas Automatizadas
 
-El proyecto cuenta con una cobertura integral de pruebas dividida en dos capas ejecutadas mediante **Vitest** y **Supertest**:
+El proyecto cuenta con una cobertura integral de **47 pruebas automatizadas** divididas en 4 suites ejecutadas mediante **Vitest** y **Supertest**:
 
 ```bash
-# Ejecutar la suite completa de pruebas
+# Ejecutar la suite completa de pruebas (47 tests)
 npm test
 
 # Ejecutar pruebas en modo observador interactivo (watch mode)
 npm run test:watch
 ```
 
-### 1. Pruebas Unitarias (`tests/jwt.test.js`)
+### 1. Pruebas Unitarias (`tests/jwt.test.js`) - 7 tests
 * Firma correcta de tokens JWT con claims (`id`, `correo`, `rol`).
 * Verificación exitosa de payloads válidos.
 * Manejo de rechazo ante firmas inválidas o claves alteradas.
 * Detección y lanzamiento de excepción ante tokens expirados.
 
-### 2. Pruebas de Integración HTTP (`tests/usuarios.test.js`)
+### 2. Pruebas de Integración de Usuarios (`tests/usuarios.test.js`) - 24 tests
 * Verificación del endpoint raíz público `GET /`.
 * Registro exitoso de usuarios `POST /usuarios` verificando persistencia real en MySQL.
 * Validación estricta de RegEx para nombres con caracteres especiales, correos inválidos y contraseñas débiles.
@@ -697,31 +835,25 @@ npm run test:watch
 * Control de acceso RBAC: rechazo de usuarios regulares en `DELETE /usuarios/:id` y autorización para usuarios `admin`.
 * Manejo de IDs inválidos y recursos inexistentes (`404 Not Found`).
 
+### 3. Pruebas de Integración de Escenas y Obras (`tests/escenas.test.js`) - 9 tests
+* Listado general de escenas `GET /escenas` con generación dinámica de `imagen_url`.
+* Filtrado por nivel de dificultad `GET /escenas?dificultad=facil`.
+* Detalle de escena existente `GET /escenas/:id` y manejo de 404 / 400.
+* Entrega de archivos estáticos `GET /imagenes/:archivo` con cabecera `Content-Type: image/jpeg`.
+* Listado y detalle de obras con escenas anidadas `GET /obras`.
+* Manejador global de rutas 404 en formato JSON.
+
+### 4. Pruebas de Integración del Motor CAPTCHA (`tests/captcha.test.js`) - 7 tests
+* Generación de desafíos `GET /captcha/nuevo` certificando que el subtítulo esperado no se expone al cliente.
+* Validación exitosa `POST /captcha/validar` con tolerancia semántica a mayúsculas y tildes (200 OK).
+* Rechazo de desafíos ya resueltos anteriormente (400 Bad Request).
+* Rechazo ante respuestas incorrectas que no coinciden con el subtítulo (400 Bad Request).
+* Validación de obligatoriedad de campos y tokens inexistentes (404 Not Found).
+
 ---
 
-## 🚀 9. Fases del Proyecto y Roadmap (Fase 2: CAPTCHA Semántico)
+## 🚀 9. Fases del Proyecto y Roadmap
 
-La estructura relacional de la base de datos (`database.sql`) ya cuenta con las entidades preparadas para la **Fase 2**:
-
-### Propuesta de Endpoints para la Fase 2
-
-```
-                                  Motor CAPTCHA
-                                        │
-        ┌───────────────────────────────┼───────────────────────────────┐
-        ▼                               ▼                               ▼
-  GET /captcha/nuevo             POST /captcha/validar            GET /obras & /escenas
-(Entrega desafío con token      (Recibe transcripción y token,   (Catálogo audiovisual
-y ruta de imagen de escena)     compara semánticamente y valida) para administración)
-```
-
-1. **`GET /captcha/nuevo`**
-   - Selecciona aleatoriamente una escena activa de la tabla `escenas`.
-   - Crea un registro efímero en `desafios_captcha` con expiración de 5 minutos y genera un UUID/token de desafío.
-   - Retorna al cliente la URL de la imagen y el token de desafío (sin revelar el texto del subtítulo).
-2. **`POST /captcha/validar`**
-   - Recibe `{ "token": "tok_...", "respuesta": "texto ingresado por el usuario" }`.
-   - Normaliza cadenas (remueve signos de puntuación, mayúsculas y acentos) y aplica similitud de Levenshtein o coincidencia semántica.
-   - Si la coincidencia supera el umbral (ej. 85%), marca el desafío como `resuelto` y emite un token de verificación humana.
-3. **`GET /obras` y `GET /escenas`**
-   - Endpoints protegidos para consultar y catalogar nuevas producciones y escenas.
+* ✅ **Fase 1 (Completada):** Subsistema de Gestión de Usuarios, Autenticación JWT, Hasheo Bcrypt (12 rondas), RBAC y validaciones RegEx.
+* ✅ **Fase 2 (Completada):** Servidor de archivos estáticos multimedia (`public/imagenes/`), catálogo de escenas y obras, y motor completo de generación y validación de desafíos CAPTCHA cultural (`/captcha/nuevo`, `/captcha/validar`).
+* 🔮 **Fase 3 (Futura):** Panel de administración en frontend (React / Vue) e integración de biblioteca cliente para inclusión de CAPTCHA mediante un componente web (`<CulturalCaptcha />`).
