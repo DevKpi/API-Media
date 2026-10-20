@@ -639,11 +639,65 @@ async function loginYPerfil() {
 loginYPerfil();
 ```
 
+#### Flujo Completo del Motor CAPTCHA (Solicitar y Resolver Desafío):
+```javascript
+async function flujoCaptcha() {
+  try {
+    // 1. Solicitar un nuevo desafío CAPTCHA
+    const resReto = await fetch("http://localhost:3000/captcha/nuevo?dificultad=facil");
+    const reto = await resReto.json();
+    console.log("Desafío recibido:", reto);
+    console.log("Cargar imagen para el usuario:", reto.imagen_url);
+
+    // 2. El usuario visualiza la escena e ingresa el texto del subtítulo
+    const textoUsuario = "No, yo soy tu padre"; // Ejemplo de transcripción
+
+    // 3. Validar la respuesta con el token entregado
+    const resValidacion = await fetch("http://localhost:3000/captcha/validar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        token: reto.token,
+        respuesta: textoUsuario,
+      }),
+    });
+
+    const resultado = await resValidacion.json();
+    if (resultado.valido) {
+      console.log("¡Verificación humana exitosa!", resultado);
+    } else {
+      console.warn("Validación fallida:", resultado.message);
+    }
+  } catch (error) {
+    console.error("Error en flujo CAPTCHA:", error.message);
+  }
+}
+
+flujoCaptcha();
+```
+
 ---
 
 ### Ejemplo 2: Probar con `cURL` desde la Terminal
 
-#### 1. Registrar Usuario:
+#### 1. Solicitar Desafío CAPTCHA:
+```bash
+curl -X GET http://localhost:3000/captcha/nuevo
+```
+
+#### 2. Validar Desafío CAPTCHA:
+```bash
+curl -X POST http://localhost:3000/captcha/validar \
+  -H "Content-Type: application/json" \
+  -d "{\"token\":\"tok_TOKEN_OBTENIDO\",\"respuesta\":\"texto del subtitulo\"}"
+```
+
+#### 3. Consultar Catálogo de Escenas:
+```bash
+curl -X GET http://localhost:3000/escenas
+```
+
+#### 4. Registrar Usuario:
 ```bash
 curl -X POST http://localhost:3000/usuarios \
   -H "Content-Type: application/json" \

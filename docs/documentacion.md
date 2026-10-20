@@ -100,6 +100,8 @@ API-Media/
 ├── package-lock.json        # Árbol de dependencias bloqueado
 ├── README.md                # Documentación principal del repositorio
 ├── IMPORTAR_BD.md           # Guía paso a paso para importar en MySQL/XAMPP
+├── public/
+│   └── imagenes/            # Archivos JPEG de escenas con subtítulos incrustados
 ├── docs/
 │   ├── documentacion.md     # Documentación técnica exhaustiva (este documento)
 │   └── openapi.yaml         # Especificación OpenAPI 3.0.3 interactiva
@@ -107,19 +109,30 @@ API-Media/
 │   ├── config/
 │   │   └── db.js            # Configuración del Connection Pool de MySQL2
 │   ├── controllers/
-│   │   └── Usuario.Controller.js # Lógica de negocio y controladores HTTP
+│   │   ├── Captcha.Controller.js # Lógica de generación y validación de CAPTCHA
+│   │   ├── Escena.Controller.js  # Lógica de consulta y catálogo de escenas
+│   │   ├── Obra.Controller.js    # Lógica de consulta de obras audiovisuales
+│   │   └── Usuario.Controller.js # Lógica de negocio de usuarios y autenticación
 │   ├── middlewares/
 │   │   ├── auth.js          # Middlewares de verificación de JWT y control RBAC
 │   │   └── validar.js       # Validaciones con expresiones regulares (RegEx)
 │   ├── models/
-│   │   └── Usuario.model.js # Abstracción y operaciones con la base de datos
+│   │   ├── Desafio.model.js # Operaciones sobre la tabla desafios_captcha
+│   │   ├── Escena.model.js  # Operaciones y joins de escenas audiovisuales
+│   │   ├── Obra.model.js    # Operaciones sobre el catálogo de obras
+│   │   └── Usuario.model.js # Abstracción y persistencia de usuarios
 │   ├── routes/
-│   │   └── Usuario.Route.js # Definición y vinculación de endpoints de usuarios
+│   │   ├── Captcha.Route.js # Endpoints del motor CAPTCHA (/captcha)
+│   │   ├── Escena.Route.js  # Endpoints de consulta de escenas (/escenas)
+│   │   ├── Obra.Route.js    # Endpoints de consulta de obras (/obras)
+│   │   └── Usuario.Route.js # Endpoints de usuarios y autenticación (/usuarios)
 │   └── utils/
 │       └── jwt.js           # Utilidades para firmado y decodificación de tokens
 └── tests/
+    ├── captcha.test.js      # Pruebas de integración del motor CAPTCHA
+    ├── escenas.test.js      # Pruebas de catálogo de escenas y archivos estáticos
     ├── jwt.test.js          # Pruebas unitarias de firmado y expiración JWT
-    └── usuarios.test.js     # Pruebas de integración de endpoints (Supertest)
+    └── usuarios.test.js     # Pruebas de integración de endpoints de usuario
 ```
 
 ---
