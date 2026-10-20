@@ -136,9 +136,9 @@ erDiagram
         int id PK
         varchar nombre
         varchar apellido
-        varchar correo UK
+        varchar correo
         varchar contrasena
-        enum rol
+        varchar rol
         timestamp creado_en
         timestamp actualizado_en
     }
@@ -146,7 +146,7 @@ erDiagram
     obras {
         int id PK
         varchar titulo
-        enum tipo
+        varchar tipo
         int anio_estreno
         timestamp creado_en
     }
@@ -170,26 +170,26 @@ erDiagram
         varchar imagen_de_escena
         text subtitulo_texto
         decimal minuto_escena
-        enum dificultad
-        tinyint activo
+        varchar dificultad
+        int activo
         timestamp creado_en
     }
 
     desafios_captcha {
         varchar id PK
-        varchar token UK
+        varchar token
         int escena_id FK
         text respuesta_esperada
-        enum estado
+        varchar estado
         timestamp expira_en
         timestamp creado_en
     }
 
-    obras ||--o{ personajes : "tiene"
-    obras ||--o{ escenas : "incluye"
-    actores ||--o{ escenas : "actúa en"
-    personajes ||--o{ escenas : "aparece en"
-    escenas ||--o{ desafios_captcha : "genera"
+    obras ||--o{ personajes : tiene
+    obras ||--o{ escenas : incluye
+    actores ||--o{ escenas : actua_en
+    personajes ||--o{ escenas : aparece_en
+    escenas ||--o{ desafios_captcha : genera
 ```
 
 ### 📋 Detalle de Tablas y Atributos
