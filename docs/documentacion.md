@@ -101,6 +101,7 @@ API-Media/
 ├── README.md                # Documentación principal del repositorio
 ├── IMPORTAR_BD.md           # Guía paso a paso para importar en MySQL/XAMPP
 ├── public/
+│   ├── demo/                # Aplicación Web Demo Interactiva (HTML5, CSS3, JS)
 │   └── imagenes/            # Archivos JPEG de escenas con subtítulos incrustados
 ├── docs/
 │   ├── documentacion.md     # Documentación técnica exhaustiva (este documento)
@@ -821,10 +822,10 @@ La API sigue rigurosamente las convenciones de la especificación RFC 9110 para 
 
 ## 🧪 8. Suite de Pruebas Automatizadas
 
-El proyecto cuenta con una cobertura integral de **47 pruebas automatizadas** divididas en 4 suites ejecutadas mediante **Vitest** y **Supertest**:
+El proyecto cuenta con una cobertura integral de **49 pruebas automatizadas** divididas en 4 suites ejecutadas mediante **Vitest** y **Supertest**:
 
 ```bash
-# Ejecutar la suite completa de pruebas (47 tests)
+# Ejecutar la suite completa de pruebas (49 tests)
 npm test
 
 # Ejecutar pruebas en modo observador interactivo (watch mode)
@@ -848,11 +849,13 @@ npm run test:watch
 * Control de acceso RBAC: rechazo de usuarios regulares en `DELETE /usuarios/:id` y autorización para usuarios `admin`.
 * Manejo de IDs inválidos y recursos inexistentes (`404 Not Found`).
 
-### 3. Pruebas de Integración de Escenas y Obras (`tests/escenas.test.js`) - 9 tests
+### 3. Pruebas de Integración de Escenas, Demo y Obras (`tests/escenas.test.js`) - 11 tests
 * Listado general de escenas `GET /escenas` con generación dinámica de `imagen_url`.
 * Filtrado por nivel de dificultad `GET /escenas?dificultad=facil`.
 * Detalle de escena existente `GET /escenas/:id` y manejo de 404 / 400.
 * Entrega de archivos estáticos `GET /imagenes/:archivo` con cabecera `Content-Type: image/jpeg`.
+* Entrega de la interfaz web interactiva `GET /demo/` con cabecera `Content-Type: text/html`.
+* Verificación de cabeceras CORS en peticiones preflight OPTIONS.
 * Listado y detalle de obras con escenas anidadas `GET /obras`.
 * Manejador global de rutas 404 en formato JSON.
 

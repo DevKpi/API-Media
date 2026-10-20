@@ -69,6 +69,20 @@ describe("Pruebas de Integración - Endpoints de Escenas, Obras e Imágenes Est�
     expect(res.headers["content-type"]).toContain("image/jpeg");
   });
 
+  it("GET /demo - Debería servir la interfaz web interactiva HTML (200)", async () => {
+    const res = await request(app).get("/demo/");
+
+    expect(res.status).toBe(200);
+    expect(res.headers["content-type"]).toContain("text/html");
+    expect(res.text).toContain("API - Media");
+  });
+
+  it("OPTIONS / - Debería incluir cabeceras CORS de acceso permitido", async () => {
+    const res = await request(app).options("/");
+
+    expect(res.headers["access-control-allow-origin"]).toBeDefined();
+  });
+
   // --- 3. Endpoints de Obras Audiovisuales ---
 
   it("GET /obras - Debería retornar todas las obras con el conteo de escenas", async () => {

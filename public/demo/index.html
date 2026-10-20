@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>API Media - Entorno de Pruebas Local</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- Barra de Navegación Superior -->
+  <header class="navbar">
+    <div class="nav-brand">
+      <span class="brand-logo">🎬</span>
+      <div>
+        <h1 class="brand-title">API - Media</h1>
+        <p class="brand-subtitle">Text-Based Cultural CAPTCHA & Auth API</p>
+      </div>
+    </div>
+    <div class="nav-actions">
+      <div class="status-indicator online">
+        <span class="status-dot"></span>
+        <span id="api-status-text">Servidor Local (3000)</span>
+      </div>
+      <a href="/api-docs" target="_blank" class="nav-link">📖 Swagger UI</a>
+      <a href="/" target="_blank" class="nav-link">⚡ Healthcheck</a>
+    </div>
+  </header>
+
+  <!-- Contenedor Principal -->
+  <main class="container">
+
+    <!-- Menú de Pestañas -->
+    <nav class="tabs-nav">
+      <button class="tab-btn active" data-tab="captcha">
+        <span class="tab-icon">🧩</span> Motor CAPTCHA en Vivo
+      </button>
+      <button class="tab-btn" data-tab="auth">
+        <span class="tab-icon">👤</span> Usuarios y Autenticación JWT
+      </button>
+      <button class="tab-btn" data-tab="catalogo">
+        <span class="tab-icon">🎬</span> Catálogo de Escenas y Obras
+      </button>
+    </nav>
+
+    <!-- ============================================================ -->
+    <!-- PESTAÑA 1: MOTOR CAPTCHA CULTURAL                            -->
+    <!-- ============================================================ -->
+    <section id="tab-captcha" class="tab-content active">
+      <div class="grid-layout">
+        
+        <!-- Panel Izquierdo: Controles del Desafío -->
+        <div class="card">
+          <div class="card-header">
+            <h2>Generar Desafío CAPTCHA</h2>
+            <p class="card-desc">Solicita una escena aleatoria con subtítulos incrustados</p>
+          </div>
+
+          <div class="form-group">
+            <label for="captcha-dificultad">Nivel de Dificultad</label>
+            <select id="captcha-dificultad" class="form-control">
+              <option value="">Todas (Aleatoria)</option>
+              <option value="facil">Fácil</option>
+              <option value="medio">Medio</option>
+              <option value="dificil">Difícil</option>
+            </select>
+          </div>
+
+          <button id="btn-generar-captcha" class="btn btn-primary btn-block">
+            🎲 Generar Nuevo Desafío
+          </button>
+
+          <hr class="divider">
+
+          <div class="info-box">
+            <h3>¿Cómo funciona este CAPTCHA?</h3>
+            <p>1. El servidor selecciona una escena de serie, película o anime.</p>
+            <p>2. Se entrega al frontend la imagen con el subtítulo incrustado y un token efímero.</p>
+            <p>3. El usuario lee la imagen y transcribe el diálogo.</p>
+            <p>4. El backend valida el texto aplicando tolerancia a tildes, mayúsculas y signos.</p>
+          </div>
+        </div>
+
+        <!-- Panel Derecho: Visualizador del Desafío y Respuesta -->
+        <div class="card">
+          <div class="card-header">
+            <h2>Desafío en Curso</h2>
+            <div id="captcha-meta-badge" class="badge badge-neutral">Sin desafío activo</div>
+          </div>
+
+          <!-- Estado inicial / Placeholder -->
+          <div id="captcha-placeholder" class="placeholder-box">
+            <div class="placeholder-icon">🖼️</div>
+            <p>Haz clic en <strong>"Generar Nuevo Desafío"</strong> para cargar un reto CAPTCHA.</p>
+          </div>
+
+          <!-- Contenedor activo de desafío (oculto por defecto) -->
+          <div id="captcha-challenge-view" class="challenge-view hidden">
+            
+            <div class="challenge-meta">
+              <div>
+                <span class="meta-label">Obra:</span>
+                <strong id="meta-obra">-</strong>
+              </div>
+              <div>
+                <span class="meta-label">Dificultad:</span>
+                <span id="meta-dificultad" class="badge badge-info">-</span>
+              </div>
+              <div>
+                <span class="meta-label">Expira en:</span>
+                <span id="meta-timer" class="badge badge-warning">10:00</span>
+              </div>
+            </div>
+
+            <div class="image-wrapper">
+              <img id="challenge-image" src="" alt="Escena del desafío CAPTCHA" class="challenge-img">
+            </div>
+
+            <div class="token-container">
+              <span class="token-label">Token de Sesión:</span>
+              <code id="meta-token" class="token-code">-</code>
+            </div>
+
+            <form id="form-validar-captcha" class="validation-form">
+              <div class="form-group">
+                <label for="input-respuesta-captcha">Transcribe el subtítulo visible en la imagen:</label>
+                <textarea 
+                  id="input-respuesta-captcha" 
+                  class="form-control" 
+                  rows="3" 
+                  placeholder="Escribe exactamente lo que lees en la imagen..."
+                  required
+                ></textarea>
+              </div>
+
+              <button type="submit" id="btn-validar-captcha" class="btn btn-success btn-block">
+                ✨ Verificar Respuesta (Validar Humano)
+              </button>
+            </form>
+
+            <!-- Caja de Resultado / Feedback -->
+            <div id="captcha-result" class="alert-box hidden"></div>
+
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- PESTAÑA 2: USUARIOS Y AUTENTICACIÓN JWT                       -->
+    <!-- ============================================================ -->
+    <section id="tab-auth" class="tab-content">
+      <div class="grid-layout">
+        
+        <!-- Panel de Formulario: Login / Registro -->
+        <div class="card">
+          <div class="subtabs-nav">
+            <button class="subtab-btn active" data-subtab="login">Iniciar Sesión</button>
+            <button class="subtab-btn" data-subtab="registro">Registrar Cuenta</button>
+          </div>
+
+          <!-- Formulario de Login -->
+          <form id="form-login" class="subtab-form active">
+            <div class="form-group">
+              <label for="login-correo">Correo Electrónico</label>
+              <input type="email" id="login-correo" class="form-control" placeholder="usuario@ejemplo.com" required>
+            </div>
+
+            <div class="form-group">
+              <label for="login-password">Contraseña</label>
+              <input type="password" id="login-password" class="form-control" placeholder="••••••••" required>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block">Ingresar</button>
+
+            <!-- Acceso Rápido con Credenciales de Prueba -->
+            <div class="quick-credentials">
+              <label class="section-label">Autocompletar con usuarios precargados:</label>
+              <div class="btn-group-chips">
+                <button type="button" class="btn-chip" data-user="admin">Admin (admin@apimedia.com)</button>
+                <button type="button" class="btn-chip" data-user="carlos">Carlos (Cliente)</button>
+                <button type="button" class="btn-chip" data-user="mariana">Mariana (Cliente)</button>
+              </div>
+            </div>
+          </form>
+
+          <!-- Formulario de Registro -->
+          <form id="form-registro" class="subtab-form">
+            <div class="form-group">
+              <label for="reg-nombre">Nombre *</label>
+              <input type="text" id="reg-nombre" class="form-control" placeholder="Ej. Juan" required>
+            </div>
+
+            <div class="form-group">
+              <label for="reg-apellido">Apellido</label>
+              <input type="text" id="reg-apellido" class="form-control" placeholder="Ej. Perez">
+            </div>
+
+            <div class="form-group">
+              <label for="reg-correo">Correo Electrónico *</label>
+              <input type="email" id="reg-correo" class="form-control" placeholder="juan@ejemplo.com" required>
+            </div>
+
+            <div class="form-group">
+              <label for="reg-password">Contraseña Segura * (8+ car., mayús., minús., núm.)</label>
+              <input type="password" id="reg-password" class="form-control" placeholder="Ej. Seguro123*" required>
+            </div>
+
+            <div class="form-group">
+              <label for="reg-rol">Rol de Usuario</label>
+              <select id="reg-rol" class="form-control">
+                <option value="cliente">Cliente (Estándar)</option>
+                <option value="admin">Administrador</option>
+              </select>
+            </div>
+
+            <button type="submit" class="btn btn-success btn-block">Crear Cuenta</button>
+          </form>
+
+          <div id="auth-alert" class="alert-box hidden"></div>
+        </div>
+
+        <!-- Panel de Estado de Sesión y Perfil -->
+        <div class="card">
+          <div class="card-header">
+            <h2>Estado de la Sesión</h2>
+            <div id="session-badge" class="badge badge-neutral">No autenticado</div>
+          </div>
+
+          <div id="session-unauthenticated" class="placeholder-box">
+            <div class="placeholder-icon">🔒</div>
+            <p>Inicia sesión para obtener un <strong>Bearer Token JWT</strong> y acceder a los endpoints protegidos.</p>
+          </div>
+
+          <div id="session-authenticated" class="authenticated-box hidden">
+            <div class="profile-card">
+              <div class="profile-avatar" id="profile-avatar">U</div>
+              <div class="profile-info">
+                <h3 id="profile-name">Nombre de Usuario</h3>
+                <p id="profile-email">usuario@ejemplo.com</p>
+                <span id="profile-role" class="badge badge-info">cliente</span>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Token JWT Activo (Bearer)</label>
+              <div class="token-copy-wrapper">
+                <input type="text" id="active-jwt-token" class="form-control token-input" readonly>
+                <button type="button" id="btn-copy-token" class="btn btn-secondary">Copiar</button>
+              </div>
+            </div>
+
+            <div class="action-buttons">
+              <button id="btn-get-perfil" class="btn btn-primary">
+                🔍 Consultar GET /usuarios/perfil
+              </button>
+              <button id="btn-logout" class="btn btn-danger">
+                🚪 Cerrar Sesión
+              </button>
+            </div>
+
+            <div class="json-viewer-container">
+              <label>Respuesta del Servidor (JSON):</label>
+              <pre id="profile-json-output" class="json-code">// Presiona "Consultar Perfil" para ver la respuesta aquí</pre>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- PESTAÑA 3: CATÁLOGO DE ESCENAS Y OBRAS                       -->
+    <!-- ============================================================ -->
+    <section id="tab-catalogo" class="tab-content">
+      <div class="card">
+        <div class="card-header-flex">
+          <div>
+            <h2>Catálogo Audiovisual</h2>
+            <p class="card-desc">Explora las producciones y escenas precargadas en MySQL</p>
+          </div>
+          <div class="filters-row">
+            <select id="catalogo-filtro-dificultad" class="form-control">
+              <option value="">Todas las dificultades</option>
+              <option value="facil">Fácil</option>
+              <option value="medio">Medio</option>
+              <option value="dificil">Difícil</option>
+            </select>
+            <button id="btn-recargar-catalogo" class="btn btn-secondary">🔄 Recargar</button>
+          </div>
+        </div>
+
+        <div id="catalogo-loading" class="loading-spinner">Cargando escenas...</div>
+        <div id="catalogo-grid" class="cards-grid"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <p>API - Media • CAPTCHA Cultural y Autenticación JWT • Entorno de Pruebas Web Local</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

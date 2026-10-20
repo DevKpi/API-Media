@@ -3,7 +3,7 @@
 [![Node.js](https://img.shields.io/badge/Node.js-18%2B-green.svg)](https://nodejs.org/)
 [![Express](https://img.shields.io/badge/Express-5.x-blue.svg)](https://expressjs.com/)
 [![MySQL](https://img.shields.io/badge/MySQL-8.0%2B-orange.svg)](https://www.mysql.com/)
-[![Tests](https://img.shields.io/badge/Tests-47%20passed-brightgreen.svg)](https://vitest.dev/)
+[![Tests](https://img.shields.io/badge/Tests-49%20passed-brightgreen.svg)](https://vitest.dev/)
 [![OpenAPI](https://img.shields.io/badge/OpenAPI-3.0.3-blue.svg)](docs/openapi.yaml)
 
 Este proyecto consiste en el desarrollo de una API diseñada para funcionar como un sistema de **CAPTCHA cultural basado en texto y reconocimiento audiovisual**. La API sirve escenas icónicas de series, películas y anime con subtítulos incrustados en la imagen, permitiendo validar la interacción humana mediante el contexto semántico de los elementos visuales y textuales expuestos.
@@ -156,6 +156,14 @@ npm start
 # Ejecutar la suite de pruebas unitarias y de integración (Vitest + Supertest)
 npm test
 ```
+
+### 5. Probar en el Navegador Web (Entorno Local)
+Una vez iniciado el servidor con `npm run dev`, puedes interactuar con la API directamente desde tu navegador:
+
+- **🌐 Web Demo Interactiva:** [http://localhost:3000/demo](http://localhost:3000/demo)  
+  *Simulador visual del CAPTCHA en vivo con imágenes, temporizador, panel de inicio de sesión con JWT y explorador de catálogo audiovisual.*
+- **📖 Swagger UI Oficial:** [http://localhost:3000/api-docs](http://localhost:3000/api-docs)  
+  *Documentación OpenAPI interactiva para probar solicitudes HTTP en tiempo real con el botón "Try it out".*
 
 ---
 
