@@ -53,9 +53,10 @@ Ambos servicios deben figurar con fondo verde en el panel de control.
 Si prefieres la terminal:
 
 1. En el **XAMPP Control Panel**, haz clic en el botón **Shell** (a la derecha).
-2. Dirígete a la carpeta del proyecto o ejecuta directamente:
+2. Dirígete a la carpeta raíz del proyecto y ejecuta:
    ```bash
-   mysql -u root -p < "C:\Users\isft118\Desktop\Software 2do\API-Media\database.sql"
+   cd ruta/a/API-Media
+   mysql -u root -p < database.sql
    ```
    *(Si el usuario `root` no tiene contraseña configurada en XAMPP, simplemente presiona `Enter` cuando pida la contraseña)*.
 
@@ -67,8 +68,8 @@ Para probar el inicio de sesión (`/usuarios/login`) y la generación de tokens 
 
 | Usuario | Correo Electrónico | Contraseña | Rol | Permisos |
 | :--- | :--- | :--- | :---: | :--- |
-| **Admin Sistema** | `admin@apimedia.com` | `Admin123*` | `admin` | Acceso total (incluye endpoints exclusivos como `DELETE`). |
-| **Leonardo Eckert** | `leonardo@ejemplo.com` | `Cliente123*` | `cliente` | Acceso a endpoints protegidos estándar (`/perfil`, `GET`, `PUT`). |
+| **Admin Sistema** | `admin@apimedia.com` | `Admin123*` | `admin` | Acceso total (crear otros admins, ver `subtitulo_texto` en catálogo, `PUT` global y `DELETE`). |
+| **Leonardo Eckert** | `leonardo@ejemplo.com` | `Cliente123*` | `cliente` | Acceso a endpoints protegidos estándar (`/perfil`, lectura y `PUT` sobre su propia cuenta). |
 | **Carlos Gomez** | `carlos.gomez@ejemplo.com` | `ClaveSegura123` | `cliente` | Acceso a endpoints protegidos estándar. |
 | **Mariana Lopez** | `mariana.lopez@ejemplo.com` | `Segura2026*` | `cliente` | Acceso a endpoints protegidos estándar. |
 

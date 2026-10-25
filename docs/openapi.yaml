@@ -3,9 +3,10 @@ info:
   title: API - Media (Text-Based CAPTCHA & User Auth API)
   version: 1.0.0
   description: |
-    API RESTful construida con Node.js, Express y MySQL2. 
-    Incluye sistema completo de registro, autenticación basada en JWT, autorización RBAC (cliente/admin) y validación RegEx.
-    Base de datos relacional preparada para motor de verificación CAPTCHA cultural de escenas y subtítulos.
+    API RESTful construida con Node.js, Express 5 y MySQL2.
+    Incluye motor activo de verificación CAPTCHA cultural basado en escenas HD con subtítulos incrustados,
+    catálogo audiovisual protegido contra scraping de respuestas, autenticación basada en JWT,
+    autorización RBAC estricta (`cliente`/`admin`, protección de titularidad BOLA) y validación RegEx.
 servers:
   - url: http://localhost:3000
     description: Servidor de desarrollo local
@@ -49,7 +50,12 @@ paths:
 
     post:
       summary: Registrar nuevo usuario
-      description: Crea una nueva cuenta de usuario con contraseña hasheada (bcrypt) y validación RegEx.
+      description: |
+        Crea una nueva cuenta de usuario con contraseña hasheada (bcrypt, 12 rondas) y validación RegEx.
+        El registro público asigna el rol `cliente`. Para crear una cuenta con rol `admin` se debe enviar un Bearer Token de administrador.
+      security:
+        - {}
+        - bearerAuth: []
       requestBody:
         required: true
         content:
@@ -71,14 +77,22 @@ paths:
                     $ref: '#/components/schemas/UsuarioRespuesta'
         '400':
           $ref: '#/components/responses/BadRequestError'
+        '403':
+          description: Intento de asignar rol 'admin' sin privilegios de administrador
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MensajeError'
+              example:
+                message: "Acceso denegado: solo un administrador autenticado puede asignar el rol 'admin'"
         '409':
           description: Conflicto - El correo ya está registrado
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/MensajeError'
-                example:
-                  message: El correo ya se encuentra registrado
+              example:
+                message: El correo ya se encuentra registrado
 
   /usuarios/login:
     post:
@@ -126,8 +140,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MensajeError'
-                example:
-                  message: Credenciales inválidas
+              example:
+                message: Credenciales inválidas
 
   /usuarios/perfil:
     get:
@@ -182,7 +196,9 @@ paths:
 
     put:
       summary: Actualizar datos de un usuario
-      description: Modifica nombre, apellido o correo de un usuario existente.
+      description: |
+        Modifica nombre, apellido o correo de un usuario existente.
+        Solo permitido para el propio titular de la cuenta (`:id`) o para un usuario con rol `admin`.
       security:
         - bearerAuth: []
       requestBody:
@@ -219,6 +235,8 @@ paths:
           $ref: '#/components/responses/BadRequestError'
         '401':
           $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
         '404':
           $ref: '#/components/responses/NotFoundError'
         '409':
@@ -256,15 +274,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MensajeError'
-                example:
-                  message: Acceso denegado: se requieren privilegios de administrador
+              example:
+                message: "Acceso denegado: se requieren privilegios de administrador"
         '404':
           $ref: '#/components/responses/NotFoundError'
 
   /captcha/nuevo:
     get:
       summary: Generar nuevo desafío CAPTCHA
-      description: Selecciona una escena aleatoria activa y emite un token efímero con URL de imagen.
+      description: Selecciona una escena aleatoria activa y emite un token efímero (10 min) con URL de imagen HD sin exponer el subtítulo.
       parameters:
         - name: dificultad
           in: query
@@ -305,11 +323,15 @@ paths:
                     format: date-time
                   instrucciones:
                     type: string
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
 
   /captcha/validar:
     post:
       summary: Validar desafío CAPTCHA
-      description: Compara la transcripción enviada por el usuario con el subtítulo esperado aplicando tolerancia semántica.
+      description: Compara la transcripción enviada por el usuario con el subtítulo esperado aplicando normalización y distancia de Levenshtein (>= 85%).
       requestBody:
         required: true
         content:
@@ -325,7 +347,7 @@ paths:
                   example: tok_9f8a7b6c5d4e3f2a1b0c...
                 respuesta:
                   type: string
-                  example: Toma la pastilla azul y el fin de la historia...
+                  example: Toma la pastilla azul y el fin de la historia. Toma la pastilla roja y te quedas en el País de las Maravillas.
       responses:
         '200':
           description: Verificación humana exitosa
@@ -345,7 +367,7 @@ paths:
                   token:
                     type: string
         '400':
-          description: Respuesta incorrecta, desafío expirado o resuelto
+          description: Respuesta incorrecta, desafío expirado o ya resuelto
           content:
             application/json:
               schema:
@@ -367,7 +389,12 @@ paths:
   /escenas:
     get:
       summary: Listar escenas audiovisuales
-      description: Retorna el catálogo de escenas con subtítulos incrustados y metadatos de actores y obras.
+      description: |
+        Retorna el catálogo de escenas con metadatos de actores, personajes y obras.
+        Por seguridad anti-scraping del CAPTCHA, el campo `subtitulo_texto` se omite en consultas públicas y solo se incluye si se autentica un usuario con rol `admin`.
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - name: obra_id
           in: query
@@ -388,30 +415,17 @@ paths:
               schema:
                 type: array
                 items:
-                  type: object
-                  properties:
-                    id:
-                      type: integer
-                    imagen_de_escena:
-                      type: string
-                    imagen_url:
-                      type: string
-                    subtitulo_texto:
-                      type: string
-                    minuto_escena:
-                      type: number
-                    dificultad:
-                      type: string
-                    obra_titulo:
-                      type: string
-                    actor_nombre:
-                      type: string
-                    personaje_nombre:
-                      type: string
+                  $ref: '#/components/schemas/EscenaRespuesta'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
 
   /escenas/{id}:
     get:
       summary: Obtener escena por ID
+      description: Retorna el detalle de una escena específica (`subtitulo_texto` visible únicamente para rol `admin`).
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - name: id
           in: path
@@ -421,6 +435,10 @@ paths:
       responses:
         '200':
           description: Detalle de escena
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EscenaRespuesta'
         '400':
           $ref: '#/components/responses/BadRequestError'
         '404':
@@ -454,6 +472,10 @@ paths:
   /obras/{id}:
     get:
       summary: Obtener obra por ID con sus escenas
+      description: Retorna los datos de la obra junto a su arreglo de escenas activas (`subtitulo_texto` incluido solo para rol `admin`).
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - name: id
           in: path
@@ -463,6 +485,23 @@ paths:
       responses:
         '200':
           description: Obra con escenas asociadas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  titulo:
+                    type: string
+                  tipo:
+                    type: string
+                  anio_estreno:
+                    type: integer
+                  escenas:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EscenaRespuesta'
         '400':
           $ref: '#/components/responses/BadRequestError'
         '404':
@@ -506,6 +545,7 @@ components:
           type: string
           enum: [cliente, admin]
           default: cliente
+          description: El valor 'admin' requiere enviar Authorization Bearer token de administrador
           example: cliente
 
     UsuarioRespuesta:
@@ -531,6 +571,39 @@ components:
           format: date-time
           example: '2026-10-20T22:30:00.000Z'
 
+    EscenaRespuesta:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        imagen_de_escena:
+          type: string
+          example: matrix_pastilla_azul_roja.jpg
+        imagen_url:
+          type: string
+          format: uri
+          example: http://localhost:3000/imagenes/matrix_pastilla_azul_roja.jpg
+        subtitulo_texto:
+          type: string
+          description: Solo presente cuando consulta un usuario autenticado con rol 'admin'
+          example: Toma la pastilla azul y el fin de la historia. Toma la pastilla roja y te quedas en el País de las Maravillas.
+        minuto_escena:
+          type: number
+          example: 28.45
+        dificultad:
+          type: string
+          example: medio
+        obra_titulo:
+          type: string
+          example: The Matrix
+        actor_nombre:
+          type: string
+          example: Laurence Fishburne
+        personaje_nombre:
+          type: string
+          example: Morpheus
+
     MensajeError:
       type: object
       properties:
@@ -540,7 +613,7 @@ components:
 
   responses:
     BadRequestError:
-      description: Solicitud incorrecta o falló la validación RegEx
+      description: Solicitud incorrecta o falló la validación RegEx / parámetros
       content:
         application/json:
           schema:
@@ -563,5 +636,5 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/MensajeError'
-            example:
-              message: Usuario no encontrado
+          example:
+            message: Recurso no encontrado

@@ -3,7 +3,7 @@
 > **Versión de la API:** 1.0.0  
 > **Entorno de Ejecución:** Node.js (ES Modules) + Express 5  
 > **Base de Datos:** MySQL 8.0+ / MariaDB (vía `mysql2/promise`)  
-> **Seguridad:** Encriptación bcrypt (12 salt rounds) + Tokens JWT (HS256) + Control de Acceso Basado en Roles (RBAC)  
+> **Seguridad:** Encriptación bcrypt (12 salt rounds) + Tokens JWT (HS256) + Control de Acceso Basado en Roles (RBAC) y Titularidad (Anti-BOLA)  
 
 ---
 
@@ -23,67 +23,68 @@
    - [6.6. GET /usuarios/:id - Detalle de Usuario por ID](#66-get-usuariosid---detalle-de-usuario-por-id)
    - [6.7. PUT /usuarios/:id - Actualización de Usuario](#67-put-usuariosid---actualización-de-usuario)
    - [6.8. DELETE /usuarios/:id - Eliminación de Usuario](#68-delete-usuariosid---eliminación-de-usuario)
+   - [6.9. GET /captcha/nuevo - Generación de Desafío CAPTCHA](#69-get-captchanuevo---generación-de-desafío-captcha)
+   - [6.10. POST /captcha/validar - Validación de Desafío CAPTCHA](#610-post-captchavalidar---validación-de-desafío-captcha)
+   - [6.11. GET /escenas - Listado del Catálogo de Escenas](#611-get-escenas---listado-del-catálogo-de-escenas)
+   - [6.12. GET /escenas/:id - Detalle de Escena por ID](#612-get-escenasid---detalle-de-escena-por-id)
+   - [6.13. GET /obras - Catálogo de Obras Audiovisuales](#613-get-obras---catálogo-de-obras-audiovisuales)
+   - [6.14. GET /obras/:id - Detalle de Obra con Escenas Asociadas](#614-get-obrasid---detalle-de-obra-con-escenas-asociadas)
+   - [6.15. GET /imagenes/:archivo - Servicio de Archivos Estáticos](#615-get-imagenesarchivo---servicio-de-archivos-estáticos)
 7. [Códigos de Estado y Manejo de Errores](#-7-códigos-de-estado-y-manejo-de-errores)
 8. [Suite de Pruebas Automatizadas](#-8-suite-de-pruebas-automatizadas)
-9. [Fases del Proyecto y Roadmap (Fase 2: CAPTCHA Semántico)](#-9-fases-del-proyecto-y-roadmap-fase-2-captcha-semántico)
+9. [Fases del Proyecto y Roadmap](#-9-fases-del-proyecto-y-roadmap)
 
 ---
 
 ## 🎯 1. Visión General del Proyecto
 
-**API - Media** es una plataforma backend diseñada con un doble propósito:
-1. **Fase 1 (Implementada y Activa):** Servir como un robusto subsistema de **Gestión de Usuarios, Autenticación y Autorización RBAC**, con almacenamiento seguro de contraseñas, validación estricta de entradas y emisión de credenciales efímeras mediante JSON Web Tokens.
-2. **Fase 2 (En Desarrollo):** Operar como un motor de **CAPTCHA cultural no convencional basado en texto e imágenes**. En lugar de requerir que los usuarios resuelvan acertijos abstractos o lean textos distorsionados, el sistema presenta escenas icónicas del cine, series de televisión y anime con subtítulos incrustados, requiriendo validación semántica contextual para certificar la interacción humana.
+**API - Media** es una plataforma backend diseñada con un doble propósito completamente integrado:
+1. **Fase 1 (Implementada y Activa):** Subsistema robusto de **Gestión de Usuarios, Autenticación JWT y Autorización RBAC**, con almacenamiento cifrado de contraseñas, validación estricta de entradas, prevención de escalada de privilegios y protección de titularidad de cuentas.
+2. **Fase 2 (Implementada y Activa):** Motor de **CAPTCHA cultural basado en texto e imágenes HD (1280×720)**. En lugar de textos distorsionados convencionales, el sistema presenta escenas cinematográficas, televisivas y de anime con subtítulos incrustados visualmente, validando la transcripción humana mediante normalización fonética/ortográfica y similitud de Levenshtein, mientras protege el catálogo contra el scraping automatizado.
 
 ---
 
 ## 🏗️ 2. Arquitectura del Software
 
-El proyecto implementa el patrón de arquitectura en capas **MVC (Modelo - Vista - Controlador)** adaptado a un servicio REST puro (sin vistas HTML acopladas en runtime).
+El proyecto implementa el patrón de arquitectura en capas **MVC (Modelo - Controlador - Rutas)** en Express 5, acompañado de un cliente web demostrativo estático (`/demo`) y documentación interactiva Swagger (`/api-docs`).
 
 ```
-                      ┌─────────────────────────────────────────┐
-                      │             Cliente HTTP                │
-                      │  (Frontend / Mobile / Postman / cURL)   │
-                      └────────────────────┬────────────────────┘
-                                           │ Request HTTP
-                                           ▼
-                      ┌─────────────────────────────────────────┐
-                      │              index.js                   │
-                      │  (Express App, JSON Parser, Enrutador)  │
-                      └────────────────────┬────────────────────┘
-                                           │
-                        ┌──────────────────┴──────────────────┐
-                        ▼                                     ▼
-             ┌─────────────────────┐               ┌─────────────────────┐
-             │   Ruta Pública /    │               │  /usuarios Router   │
-             └─────────────────────┘               └──────────┬──────────┘
-                                                              │
-                                                              ▼
-                                                   ┌─────────────────────┐
-                                                   │    Middlewares      │
-                                                   │ 1. RegEx Validación │
-                                                   │ 2. JWT verificación │
-                                                   │ 3. RBAC (soloAdmin) │
-                                                   └──────────┬──────────┘
-                                                              │
-                                                              ▼
-                                                   ┌─────────────────────┐
-                                                   │ UsuarioController   │
-                                                   │ (Lógica de Negocio) │
-                                                   └──────────┬──────────┘
-                                                              │
-                                                              ▼
-                                                   ┌─────────────────────┐
-                                                   │    Usuario Model    │
-                                                   │  (Consultas SQL)    │
-                                                   └──────────┬──────────┘
-                                                              │
-                                                              ▼
-                                                   ┌─────────────────────┐
-                                                   │    Pool MySQL2      │
-                                                   │  (db.js - Conexión) │
-                                                   └─────────────────────┘
+                       ┌─────────────────────────────────────────────┐
+                       │                Cliente HTTP                 │
+                       │  (Web Demo / Swagger UI / Frontend / cURL)  │
+                       └──────────────────────┬──────────────────────┘
+                                              │ Request HTTP
+                                              ▼
+                       ┌─────────────────────────────────────────────┐
+                       │                  index.js                   │
+                       │ (Express 5, CORS, JSON, Estáticos, Swagger) │
+                       └──────┬───────────────┼───────────────┬──────┘
+                              │               │               │
+               ┌──────────────┘               │               └──────────────┐
+               ▼                              ▼                              ▼
+    ┌─────────────────────┐        ┌─────────────────────┐        ┌─────────────────────┐
+    │   /usuarios Router  │        │   /captcha Router   │        │ /escenas & /obras   │
+    └──────────┬──────────┘        └──────────┬──────────┘        └──────────┬──────────┘
+               │                              │                              │
+               ▼                              ▼                              ▼
+    ┌─────────────────────┐        ┌─────────────────────┐        ┌─────────────────────┐
+    │    Middlewares      │        │  CaptchaController  │        │ verificarAuthOpc.   │
+    │ • validar.js (RegEx)│        │ • Normalización NFD │        │ (Oculta subtítulos  │
+    │ • verificarAuth/Opc │        │ • Levenshtein >=85% │        │  a no-admins)       │
+    │ • propietarioOAdmin │        └──────────┬──────────┘        └──────────┬──────────┘
+    │ • soloAdmin         │                   │                              │
+    └──────────┬──────────┘                   │                              │
+               ▼                              ▼                              ▼
+    ┌─────────────────────┐        ┌─────────────────────┐        ┌─────────────────────┐
+    │  UsuarioController  │        │ Desafio / Escena    │        │ Escena / Obra       │
+    │  & Usuario Model    │        │       Models        │        │    Controllers      │
+    └──────────┬──────────┘        └──────────┬──────────┘        └──────────┬──────────┘
+               └──────────────────────────────┼──────────────────────────────┘
+                                              ▼
+                                   ┌─────────────────────┐
+                                   │     Pool MySQL2     │
+                                   │  (db.js - Conexión) │
+                                   └─────────────────────┘
 ```
 
 ### 📁 Estructura del Árbol de Archivos
@@ -97,12 +98,11 @@ API-Media/
 ├── seed_data.sql            # Script de limpieza y recarga rápida de datos
 ├── index.js                 # Punto de entrada principal y bootstrap del servidor
 ├── package.json             # Manifiesto de dependencias y scripts de ejecución
-├── package-lock.json        # Árbol de dependencias bloqueado
 ├── README.md                # Documentación principal del repositorio
 ├── IMPORTAR_BD.md           # Guía paso a paso para importar en MySQL/XAMPP
 ├── public/
 │   ├── demo/                # Aplicación Web Demo Interactiva (HTML5, CSS3, JS)
-│   └── imagenes/            # Archivos JPEG de escenas con subtítulos incrustados
+│   └── imagenes/            # Escenas JPEG HD (1280x720) con subtítulos incrustados
 ├── docs/
 │   ├── documentacion.md     # Documentación técnica exhaustiva (este documento)
 │   └── openapi.yaml         # Especificación OpenAPI 3.0.3 interactiva
@@ -115,8 +115,8 @@ API-Media/
 │   │   ├── Obra.Controller.js    # Lógica de consulta de obras audiovisuales
 │   │   └── Usuario.Controller.js # Lógica de negocio de usuarios y autenticación
 │   ├── middlewares/
-│   │   ├── auth.js          # Middlewares de verificación de JWT y control RBAC
-│   │   └── validar.js       # Validaciones con expresiones regulares (RegEx)
+│   │   ├── auth.js          # Middlewares JWT, RBAC y titularidad (propietarioOAdmin)
+│   │   └── validar.js       # Validaciones con expresiones regulares y tipos
 │   ├── models/
 │   │   ├── Desafio.model.js # Operaciones sobre la tabla desafios_captcha
 │   │   ├── Escena.model.js  # Operaciones y joins de escenas audiovisuales
@@ -130,10 +130,10 @@ API-Media/
 │   └── utils/
 │       └── jwt.js           # Utilidades para firmado y decodificación de tokens
 └── tests/
-    ├── captcha.test.js      # Pruebas de integración del motor CAPTCHA
-    ├── escenas.test.js      # Pruebas de catálogo de escenas y archivos estáticos
-    ├── jwt.test.js          # Pruebas unitarias de firmado y expiración JWT
-    └── usuarios.test.js     # Pruebas de integración de endpoints de usuario
+    ├── captcha.test.js      # Pruebas de integración del motor CAPTCHA (9 tests)
+    ├── escenas.test.js      # Pruebas de catálogo, anti-scraping y estáticos (13 tests)
+    ├── jwt.test.js          # Pruebas unitarias de JWT y middlewares RBAC (9 tests)
+    └── usuarios.test.js     # Pruebas de integración de usuarios y seguridad (27 tests)
 ```
 
 ---
@@ -213,50 +213,36 @@ Gestiona las credenciales de acceso y la autorización en el sistema.
 * `id` (`INT AUTO_INCREMENT`, **PK**): Identificador numérico secuencial.
 * `nombre` (`VARCHAR(100)`, **NOT NULL**): Nombre del usuario.
 * `apellido` (`VARCHAR(100)`, **NULL**): Apellido opcional.
-* `correo` (`VARCHAR(150)`, **NOT NULL, UNIQUE**): Dirección de correo única para inicio de sesión.
-* `contrasena` (`VARCHAR(255)`, **NOT NULL**): Hash de contraseña generado con bcrypt.
+* `correo` (`VARCHAR(150)`, **NOT NULL, UNIQUE**): Dirección de correo única normalizada en minúsculas.
+* `contrasena` (`VARCHAR(255)`, **NOT NULL**): Hash de contraseña generado con bcrypt (12 rondas).
 * `rol` (`ENUM('admin', 'cliente')`, Default `'cliente'`): Nivel de privilegios RBAC.
-* `creado_en` (`TIMESTAMP`, Default `CURRENT_TIMESTAMP`): Fecha de creación.
-* `actualizado_en` (`TIMESTAMP`, `ON UPDATE CURRENT_TIMESTAMP`): Última modificación.
+* `creado_en` / `actualizado_en` (`TIMESTAMP`): Marcas de auditoría automáticas.
 
 #### 2. Tabla `obras`
-Almacena las obras audiovisuales de referencia cultural.
-* `id` (`INT AUTO_INCREMENT`, **PK**): Identificador de la obra.
-* `titulo` (`VARCHAR(150)`, **NOT NULL**): Título comercial de la obra.
-* `tipo` (`ENUM('pelicula', 'serie', 'anime')`, **NOT NULL**): Formato de la obra.
-* `anio_estreno` (`INT`, **NOT NULL**): Año original de lanzamiento.
+Almacena las obras audiovisuales de referencia cultural (`pelicula`, `serie`, `anime`).
 
 #### 3. Tabla `actores`
 Registro de actores y actrices de imagen real o actores de voz.
-* `id` (`INT AUTO_INCREMENT`, **PK**): Identificador del actor.
-* `nombre_completo` (`VARCHAR(150)`, **NOT NULL**): Nombre real del intérprete.
 
 #### 4. Tabla `personajes`
-Personajes ficticios pertenecientes a una obra específica.
-* `id` (`INT AUTO_INCREMENT`, **PK**): Identificador del personaje.
-* `obra_id` (`INT`, **FK** -> `obras.id` `ON DELETE CASCADE`): Obra a la que pertenece.
-* `nombre` (`VARCHAR(150)`, **NOT NULL**): Nombre del personaje en la ficción.
+Personajes ficticios pertenecientes a una obra específica (`obra_id` FK `ON DELETE CASCADE`).
 
 #### 5. Tabla `escenas`
 Elemento multimedia central del motor CAPTCHA.
-* `id` (`INT AUTO_INCREMENT`, **PK**): Identificador de la escena.
-* `obra_id` (`INT`, **FK** -> `obras.id` `ON DELETE RESTRICT`): Obra de origen.
-* `actor_id` (`INT`, **FK** -> `actores.id` `ON DELETE SET NULL`): Actor que aparece.
-* `personaje_id` (`INT`, **FK** -> `personajes.id` `ON DELETE SET NULL`): Personaje involucrado.
-* `imagen_de_escena` (`VARCHAR(255)`, **NOT NULL**): Archivo de imagen con subtítulo integrado.
-* `subtitulo_texto` (`TEXT`, **NOT NULL**): Transcripción textual del diálogo para comparación semántica.
+* `imagen_de_escena` (`VARCHAR(255)`, **NOT NULL**): Archivo JPEG HD (1280×720) ubicado en `public/imagenes/` con el subtítulo incrustado visualmente.
+* `subtitulo_texto` (`TEXT`, **NOT NULL**): Transcripción textual secreta empleada por el backend para validación semántica.
 * `minuto_escena` (`DECIMAL(6,2)`, **NOT NULL**): Marca temporal exacta en el metraje.
 * `dificultad` (`ENUM('facil', 'medio', 'dificil')`, Default `'medio'`).
-* `activo` (`TINYINT(1)`, Default `1`): Estado de disponibilidad para el desafío.
+* `activo` (`TINYINT(1)`, Default `1`): Disponibilidad para retos.
 
 #### 6. Tabla `desafios_captcha`
 Sesiones efímeras de verificación humana generadas para los clientes.
 * `id` (`VARCHAR(36)`, **PK**): UUID v4 único del desafío.
-* `token` (`VARCHAR(64)`, **NOT NULL, UNIQUE**): Token público entregado al frontend.
-* `escena_id` (`INT`, **FK** -> `escenas.id` `ON DELETE CASCADE`): Escena seleccionada.
-* `respuesta_esperada` (`TEXT`, **NOT NULL**): Respuesta o palabras clave requeridas.
+* `token` (`VARCHAR(64)`, **NOT NULL, UNIQUE**): Token público de un solo uso entregado al frontend.
+* `escena_id` (`INT`, **FK** -> `escenas.id` `ON DELETE CASCADE`).
+* `respuesta_esperada` (`TEXT`, **NOT NULL**): Subtítulo esperado asociado al desafío.
 * `estado` (`ENUM('pendiente', 'resuelto', 'expirado')`, Default `'pendiente'`).
-* `expira_en` (`TIMESTAMP`, **NOT NULL**): Plazo límite de validez del reto.
+* `expira_en` (`TIMESTAMP`, **NOT NULL**): Plazo límite de validez (10 minutos).
 
 ---
 
@@ -264,612 +250,212 @@ Sesiones efímeras de verificación humana generadas para los clientes.
 
 ### 1. Hash de Contraseñas con `bcrypt`
 * **Factor de costo (Salt rounds):** `12`.
-* Se aplica hashing asíncrono antes de insertar en la base de datos:
-  ```javascript
-  const contrasenaHasheada = await bcrypt.hash(contrasena, 12);
-  ```
-* En el login, se compara mediante `bcrypt.compare(contrasena, usuario.contrasena)`.
-* **Regla estricta:** La contraseña nunca se retorna en ninguna respuesta HTTP ni en el payload del JWT.
+* La contraseña nunca se retorna en ninguna respuesta HTTP ni en el payload del JWT.
 
 ### 2. Tokens JWT (JSON Web Tokens)
 * **Algoritmo:** HMAC-SHA256 (`HS256`).
 * **Variables requeridas:** `JWT_SECRET` y `JWT_EXPIRES_IN` (por defecto `2h`).
-* **Estructura del Payload:**
-  ```json
-  {
-    "id": 2,
-    "correo": "usuario@ejemplo.com",
-    "rol": "cliente",
-    "iat": 1729450000,
-    "exp": 1729457200
-  }
-  ```
-* **Header de Autenticación Requerido:**
-  ```http
-  Authorization: Bearer <token_jwt>
-  ```
 
-### 3. Control de Acceso Basado en Roles (RBAC)
-* Middleware `verificarAuth`: Valida presencia, formato y firma del token. Inyecta `req.usuario` con el payload decodificado.
-* Middleware `soloAdmin`: Verifica que `req.usuario.rol === "admin"`. Si no lo es, responde con `403 Forbidden`.
-* Middleware `permitirRoles(...roles)`: Validador configurable para escenarios multi-rol.
+### 3. Control de Acceso Basado en Roles (RBAC) y Titularidad (Anti-BOLA)
+* `verificarAuth`: Valida presencia, formato `Bearer <token>` y firma criptográfica del JWT.
+* `verificarAuthOpcional`: Identifica sesiones `admin` en endpoints públicos híbridos (`POST /usuarios`, `GET /escenas`, `GET /obras/:id`) sin bloquear a visitantes anónimos.
+* `soloAdmin`: Restringe operaciones críticas (`DELETE /usuarios/:id`) exclusivamente al rol `admin`.
+* `propietarioOAdmin`: Previene vulnerabilidades *Broken Object Level Authorization (BOLA/IDOR)* en `PUT /usuarios/:id`, garantizando que un cliente solo pueda modificar su propio perfil mientras un administrador conserva capacidad de gestión global.
+* **Prevención de Escalada de Privilegios:** En `POST /usuarios`, cualquier intento de registrar `"rol": "admin"` sin un Bearer Token de administrador activo es rechazado con `403 Forbidden`.
 
-### 4. Prevención de Inyección SQL
-Todas las consultas a la base de datos se ejecutan a través de **sentencias preparadas parametrizadas** provistas por `mysql2/promise`:
-```javascript
-const [rows] = await pool.query(
-  "SELECT id, nombre, apellido, correo, rol, creado_en FROM usuarios WHERE id = ?",
-  [id]
-);
-```
+### 4. Protección Anti-Scraping del Motor CAPTCHA y Anti-Replay
+* Los endpoints públicos de catálogo (`/escenas`, `/escenas/:id` y `/obras/:id`) **suprimen el campo `subtitulo_texto`** para usuarios no administradores, impidiendo que bots crucen el nombre de la imagen con el catálogo para resolver desafíos automáticamente.
+* En `POST /captcha/validar`, el token recibido se sanea con `.trim()` tanto al consultar como al actualizar el estado en MySQL, bloqueando ataques de reutilización (*replay*) mediante inyección de espacios laterales.
+
+### 5. Prevención de Inyección SQL
+Todas las consultas SQL emplean **sentencias preparadas parametrizadas** (`?`) de `mysql2/promise`.
 
 ---
 
 ## 🛡️ 5. Reglas de Validación y Expresiones Regulares (RegEx)
 
-El middleware [validar.js](file:///C:/Users/isft118/Desktop/Software%202do/API-Media/src/middlewares/validar.js) aplica validaciones antes de que cualquier dato llegue a los controladores o la base de datos:
+El middleware [validar.js](../src/middlewares/validar.js) verifica tipos de datos (`typeof === "string"`), presencia ante cuerpos vacíos en Express 5 y formatos RegEx antes de llegar a los controladores:
 
 | Campo | Expresión Regular | Descripción / Restricciones |
 | :--- | :--- | :--- |
 | `nombre` | `^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]{2,50}$` | Solo letras (incluye acentos, ñ, diéresis) y espacios. De 2 a 50 caracteres. |
 | `apellido` | `^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]{2,50}$` | Opcional. Si se envía, cumple con las mismas reglas de `nombre`. |
-| `correo` | `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$` | Formato estándar de email internacional (`nombre@dominio.ext`). |
+| `correo` | `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$` | Formato estándar de email internacional (`nombre@dominio.ext`), normalizado en minúsculas. |
 | `contrasena` | `^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$` | Mínimo 8 caracteres, al menos 1 letra mayúscula, 1 minúscula y 1 número. |
-| `rol` | Validación de dominio (`['cliente', 'admin']`) | Opcional al registrar. Debe ser exactamente uno de los dos valores válidos. |
+| `rol` | Dominio `['cliente', 'admin']` | Opcional (`'cliente'` por defecto). `'admin'` exige autenticación de administrador. |
 
 ---
 
 ## 📡 6. Referencia Completa de Endpoints
 
 ### 6.1. GET / - Verificación de Estado
-Endpoint de bienvenida y comprobación básica de disponibilidad del servidor (*healthcheck*).
-
-* **Método:** `GET`
-* **URL:** `/`
-* **Acceso:** Público (Sin autenticación)
-* **Respuesta Exitosa (`200 OK`):**
-  ```json
-  {
-    "message": "Bienvenido a la API de Media!"
-  }
-  ```
+* **Acceso:** Público
+* **Respuesta (`200 OK`):** `{ "message": "Bienvenido a la API de Media!" }`
 
 ---
 
 ### 6.2. POST /usuarios - Registro de Usuario
-Registra un nuevo usuario en la plataforma. Valida los datos con expresiones regulares, comprueba unicidad del correo y hashea la contraseña con bcrypt.
+Registra un nuevo usuario validando RegEx, unicidad de correo y hasheo bcrypt (12 rondas).
 
-* **Método:** `POST`
-* **URL:** `/usuarios`
-* **Acceso:** Público
-* **Headers:**
-  ```http
-  Content-Type: application/json
-  ```
-* **Cuerpo de la Petición (JSON):**
-  ```json
-  {
-    "nombre": "Carlos",
-    "apellido": "Gomez",
-    "correo": "carlos.gomez@ejemplo.com",
-    "contrasena": "ClaveSegura123",
-    "rol": "cliente"
-  }
-  ```
-  *(Nota: `apellido` y `rol` son opcionales. `rol` por defecto es `"cliente"`).*
-
-* **Respuesta Exitosa (`201 Created`):**
-  ```json
-  {
-    "message": "Usuario creado con éxito",
-    "usuario": {
-      "id": 2,
-      "nombre": "Carlos",
-      "apellido": "Gomez",
-      "correo": "carlos.gomez@ejemplo.com",
-      "rol": "cliente",
-      "creado_en": "2026-10-20T22:30:00.000Z"
-    }
-  }
-  ```
-
-* **Respuestas de Error:**
-  * **`400 Bad Request`** - Faltan campos obligatorios:
-    ```json
-    { "message": "Nombre, correo y contraseña son obligatorios" }
-    ```
-  * **`400 Bad Request`** - Formato inválido de nombre o apellido:
-    ```json
-    { "message": "El nombre solo debe contener letras y tener entre 2 y 50 caracteres" }
-    ```
-  * **`400 Bad Request`** - Formato de correo no válido:
-    ```json
-    { "message": "El formato del correo electrónico no es válido (ej: usuario@dominio.com)" }
-    ```
-  * **`400 Bad Request`** - Contraseña no cumple política de seguridad:
-    ```json
-    { "message": "La contraseña debe tener al menos 8 caracteres, incluir al menos una letra mayúscula, una minúscula y un número" }
-    ```
-  * **`400 Bad Request`** - Rol no válido:
-    ```json
-    { "message": "El rol proporcionado no es válido. Debe ser 'cliente' o 'admin'" }
-    ```
-  * **`409 Conflict`** - Correo duplicado:
-    ```json
-    { "message": "El correo ya se encuentra registrado" }
-    ```
+* **Acceso:** Público para rol `cliente` / Requiere Token Admin para asignar rol `admin`.
+* **Respuesta Exitosa (`201 Created`):** Retorna `message` y objeto `usuario` sin contraseña.
+* **Errores:**
+  * `400 Bad Request`: Campos faltantes, tipos inválidos, fallo RegEx o rol fuera de `['cliente', 'admin']`.
+  * `403 Forbidden`: `{ "message": "Acceso denegado: solo un administrador autenticado puede asignar el rol 'admin'" }`.
+  * `409 Conflict`: `{ "message": "El correo ya se encuentra registrado" }`.
 
 ---
 
 ### 6.3. POST /usuarios/login - Inicio de Sesión
-Autentica las credenciales de un usuario existente. Si son válidas, emite un token JWT con vigencia de 2 horas.
-
-* **Método:** `POST`
-* **URL:** `/usuarios/login`
 * **Acceso:** Público
-* **Headers:**
-  ```http
-  Content-Type: application/json
-  ```
-* **Cuerpo de la Petición (JSON):**
-  ```json
-  {
-    "correo": "carlos.gomez@ejemplo.com",
-    "contrasena": "ClaveSegura123"
-  }
-  ```
-
-* **Respuesta Exitosa (`200 OK`):**
-  ```json
-  {
-    "message": "Inicio de sesión exitoso",
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6Miw...",
-    "usuario": {
-      "id": 2,
-      "nombre": "Carlos",
-      "apellido": "Gomez",
-      "correo": "carlos.gomez@ejemplo.com",
-      "rol": "cliente",
-      "creado_en": "2026-10-20T22:30:00.000Z",
-      "actualizado_en": "2026-10-20T22:30:00.000Z"
-    }
-  }
-  ```
-
-* **Respuestas de Error:**
-  * **`400 Bad Request`** - Campos vacíos o correo no válido:
-    ```json
-    { "message": "Correo y contraseña son obligatorios" }
-    ```
-  * **`401 Unauthorized`** - Credenciales erróneas (correo inexistente o contraseña incorrecta):
-    ```json
-    { "message": "Credenciales inválidas" }
-    ```
+* **Respuesta Exitosa (`200 OK`):** Retorna `message`, `token` JWT (2h) y objeto `usuario`.
+* **Errores:** `400 Bad Request` (datos faltantes/formato inválido), `401 Unauthorized` (`Credenciales inválidas`).
 
 ---
 
 ### 6.4. GET /usuarios/perfil - Perfil del Usuario Autenticado
-Retorna la información del usuario en sesión, extrayendo su identidad directamente del token JWT decodificado.
-
-* **Método:** `GET`
-* **URL:** `/usuarios/perfil`
 * **Acceso:** Requiere Token JWT (`cliente` o `admin`)
-* **Headers:**
-  ```http
-  Authorization: Bearer <token_jwt>
-  ```
-
-* **Respuesta Exitosa (`200 OK`):**
-  ```json
-  {
-    "id": 2,
-    "nombre": "Carlos",
-    "apellido": "Gomez",
-    "correo": "carlos.gomez@ejemplo.com",
-    "rol": "cliente",
-    "creado_en": "2026-10-20T22:30:00.000Z"
-  }
-  ```
-
-* **Respuestas de Error:**
-  * **`401 Unauthorized`** - Token ausente:
-    ```json
-    { "message": "Token de autenticación no proporcionado" }
-    ```
-  * **`401 Unauthorized`** - Formato incorrecto del header:
-    ```json
-    { "message": "Formato de token inválido. Formato esperado: Bearer <token>" }
-    ```
-  * **`401 Unauthorized`** - Token expirado:
-    ```json
-    { "message": "Token expirado. Inicie sesión nuevamente" }
-    ```
-  * **`403 Forbidden`** - Firma inválida o token manipulado:
-    ```json
-    { "message": "Token inválido o alterado" }
-    ```
-  * **`404 Not Found`** - El usuario contenido en el token ya no existe en la base de datos:
-    ```json
-    { "message": "Usuario no encontrado" }
-    ```
+* **Respuesta Exitosa (`200 OK`):** Datos del usuario extraídos del token.
+* **Errores:** `401 Unauthorized`, `403 Forbidden`, `404 Not Found`.
 
 ---
 
 ### 6.5. GET /usuarios - Listado General de Usuarios
-Obtiene la lista completa de todos los usuarios registrados en el sistema, ordenados por ID de manera ascendente.
-
-* **Método:** `GET`
-* **URL:** `/usuarios`
 * **Acceso:** Requiere Token JWT (`cliente` o `admin`)
-* **Headers:**
-  ```http
-  Authorization: Bearer <token_jwt>
-  ```
-
-* **Respuesta Exitosa (`200 OK`):**
-  ```json
-  [
-    {
-      "id": 1,
-      "nombre": "Admin",
-      "apellido": "Sistema",
-      "correo": "admin@apimedia.com",
-      "rol": "admin",
-      "creado_en": "2026-10-20T20:00:00.000Z"
-    },
-    {
-      "id": 2,
-      "nombre": "Carlos",
-      "apellido": "Gomez",
-      "correo": "carlos.gomez@ejemplo.com",
-      "rol": "cliente",
-      "creado_en": "2026-10-20T22:30:00.000Z"
-    }
-  ]
-  ```
-
-* **Respuestas de Error:**
-  * Las mismas respuestas de autenticación `401 Unauthorized` o `403 Forbidden` documentadas en el endpoint 6.4.
+* **Respuesta Exitosa (`200 OK`):** Arreglo ordenado de usuarios registrados (sin contraseñas).
 
 ---
 
 ### 6.6. GET /usuarios/:id - Detalle de Usuario por ID
-Recupera los datos públicos de un usuario específico a través de su identificador numérico.
-
-* **Método:** `GET`
-* **URL:** `/usuarios/:id`
 * **Acceso:** Requiere Token JWT (`cliente` o `admin`)
-* **Headers:**
-  ```http
-  Authorization: Bearer <token_jwt>
-  ```
-* **Parámetros de Ruta:**
-  * `id` (`integer`, obligatorio): Identificador numérico del usuario (ej: `/usuarios/2`).
-
-* **Respuesta Exitosa (`200 OK`):**
-  ```json
-  {
-    "id": 2,
-    "nombre": "Carlos",
-    "apellido": "Gomez",
-    "correo": "carlos.gomez@ejemplo.com",
-    "rol": "cliente",
-    "creado_en": "2026-10-20T22:30:00.000Z"
-  }
-  ```
-
-* **Respuestas de Error:**
-  * **`400 Bad Request`** - Parámetro `id` no es un número:
-    ```json
-    { "message": "El ID proporcionado debe ser un número válido" }
-    ```
-  * **`404 Not Found`** - No existe usuario con ese identificador:
-    ```json
-    { "message": "Usuario no encontrado" }
-    ```
+* **Errores:** `400 Bad Request` (ID no entero positivo), `404 Not Found`.
 
 ---
 
 ### 6.7. PUT /usuarios/:id - Actualización de Usuario
-Actualiza selectivamente los datos generales (`nombre`, `apellido`, `correo`) de un usuario. Solo se modifican los campos enviados en el cuerpo JSON.
+Actualiza selectivamente `nombre`, `apellido` o `correo`.
 
-* **Método:** `PUT`
-* **URL:** `/usuarios/:id`
-* **Acceso:** Requiere Token JWT
-* **Headers:**
-  ```http
-  Content-Type: application/json
-  Authorization: Bearer <token_jwt>
-  ```
-* **Parámetros de Ruta:**
-  * `id` (`integer`, obligatorio): Identificador numérico del usuario a modificar.
-
-* **Cuerpo de la Petición (JSON):**
-  ```json
-  {
-    "nombre": "Carlos Actualizado",
-    "apellido": "Gomez Perez"
-  }
-  ```
-
-* **Respuesta Exitosa (`200 OK`):**
-  ```json
-  {
-    "message": "Usuario actualizado correctamente",
-    "usuario": {
-      "id": 2,
-      "nombre": "Carlos Actualizado",
-      "apellido": "Gomez Perez",
-      "correo": "carlos.gomez@ejemplo.com",
-      "rol": "cliente",
-      "creado_en": "2026-10-20T22:30:00.000Z"
-    }
-  }
-  ```
-
-* **Respuestas de Error:**
-  * **`400 Bad Request`** - Cuerpo vacío o sin campos reconocidos:
-    ```json
-    { "message": "Debe enviar al menos un campo para actualizar" }
-    ```
-  * **`400 Bad Request`** - Formato RegEx inválido en los datos modificados:
-    ```json
-    { "message": "El formato del correo electrónico no es válido (ej: usuario@dominio.com)" }
-    ```
-  * **`404 Not Found`** - Usuario inexistente:
-    ```json
-    { "message": "Usuario no encontrado" }
-    ```
-  * **`409 Conflict`** - El nuevo correo ya está registrado por otro usuario:
-    ```json
-    { "message": "El nuevo correo ya está en uso por otro usuario" }
-    ```
+* **Acceso:** Requiere Token JWT + Middleware `propietarioOAdmin` (solo el titular del `:id` o un `admin`).
+* **Respuesta Exitosa (`200 OK`):** `{ "message": "Usuario actualizado correctamente", "usuario": { ... } }`.
+* **Errores:** `400 Bad Request`, `401 Unauthorized`, `403 Forbidden` (intento de modificar cuenta ajena), `404 Not Found`, `409 Conflict` (nuevo correo en uso).
 
 ---
 
 ### 6.8. DELETE /usuarios/:id - Eliminación de Usuario
-Elimina permanentemente un usuario de la base de datos. Requiere privilegios estrictos de administrador (`rol: admin`).
-
-* **Método:** `DELETE`
-* **URL:** `/usuarios/:id`
-* **Acceso:** Requiere Token JWT con **Rol Admin Exclusivo**
-* **Headers:**
-  ```http
-  Authorization: Bearer <token_admin>
-  ```
-* **Parámetros de Ruta:**
-  * `id` (`integer`, obligatorio): Identificador del usuario a suprimir.
-
-* **Respuesta Exitosa (`200 OK`):**
-  ```json
-  {
-    "message": "Usuario eliminado correctamente",
-    "usuario": {
-      "id": 2,
-      "nombre": "Carlos Actualizado",
-      "apellido": "Gomez Perez",
-      "correo": "carlos.gomez@ejemplo.com",
-      "rol": "cliente",
-      "creado_en": "2026-10-20T22:30:00.000Z"
-    }
-  }
-  ```
-
-* **Respuestas de Error:**
-  * **`401 Unauthorized`** - Sin token de autenticación.
-  * **`403 Forbidden`** - Usuario autenticado pero sin rol de administrador:
-    ```json
-    { "message": "Acceso denegado: se requieren privilegios de administrador" }
-    ```
-  * **`404 Not Found`** - El usuario con el ID especificado no existe.
+* **Acceso:** Requiere Token JWT con **Rol Admin Exclusivo** (`soloAdmin`).
+* **Respuesta Exitosa (`200 OK`):** `{ "message": "Usuario eliminado correctamente", "usuario": { ... } }`.
+* **Errores:** `400 Bad Request`, `401 Unauthorized`, `403 Forbidden`, `404 Not Found`.
 
 ---
 
 ### 6.9. GET /captcha/nuevo - Generación de Desafío CAPTCHA
-Selecciona aleatoriamente una escena audiovisual activa y genera un desafío efímero con vigencia de 10 minutos en la tabla `desafios_captcha`. Retorna al cliente la URL de la escena con subtítulos incrustados y un token único de verificación sin exponer el texto del subtítulo.
+Limpia retos vencidos, selecciona aleatoriamente una escena activa y emite un desafío efímero (10 minutos) con URL de imagen HD (`1280x720`) sin exponer el texto del subtítulo.
 
-* **Método:** `GET`
-* **URL:** `/captcha/nuevo`
 * **Acceso:** Público
-* **Parámetros de Consulta (Opcionales):**
-  * `dificultad` (`facil`, `medio`, `dificil`): Filtra el reto por nivel de complejidad.
-* **Respuesta Exitosa (`201 Created`):**
-  ```json
-  {
-    "message": "Desafío CAPTCHA generado con éxito",
-    "desafio_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-    "token": "tok_9f8a7b6c5d4e3f2a1b0c8d7e6f5a4b3c",
-    "imagen_url": "http://localhost:3000/imagenes/matrix_pastilla_azul_roja.jpg",
-    "dificultad": "medio",
-    "obra": "The Matrix",
-    "expira_en": "2026-10-20T23:00:00.000Z",
-    "instrucciones": "Escribe el texto del subtítulo visible en la imagen para validar que eres humano."
-  }
-  ```
+* **Query Params (Opcional):** `dificultad` (`facil` | `medio` | `dificil`).
+* **Respuesta Exitosa (`201 Created`):** `desafio_id`, `token`, `imagen_url`, `dificultad`, `obra`, `expira_en`, `instrucciones`.
+* **Errores:** `400 Bad Request` (dificultad inválida), `404 Not Found` (sin escenas disponibles).
 
 ---
 
 ### 6.10. POST /captcha/validar - Validación de Desafío CAPTCHA
-Recibe el token público y la transcripción provista por el usuario. Aplica normalización de caracteres (remueve tildes, mayúsculas, signos tipográficos y espacios redundantes) y ejecuta un cálculo de similitud mediante la distancia de Levenshtein (umbral de aceptación >= 85%) para tolerar deslices ortográficos leves.
+Sanea el token, verifica vigencia/estado único, normaliza caracteres NFD y evalúa similitud por distancia de Levenshtein (`>= 85%`).
 
-* **Método:** `POST`
-* **URL:** `/captcha/validar`
 * **Acceso:** Público
-* **Headers:** `Content-Type: application/json`
-* **Cuerpo de la Petición (JSON):**
-  ```json
-  {
-    "token": "tok_9f8a7b6c5d4e3f2a1b0c8d7e6f5a4b3c",
-    "respuesta": "toma la pastilla azul y el fin de la historia"
-  }
-  ```
-* **Respuesta Exitosa (`200 OK`):**
-  ```json
-  {
-    "valido": true,
-    "message": "Verificación humana exitosa",
-    "desafio_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-    "token": "tok_9f8a7b6c5d4e3f2a1b0c8d7e6f5a4b3c"
-  }
-  ```
-* **Respuestas de Error:**
-  * **`400 Bad Request`** - Respuesta errónea o discrepante:
-    ```json
-    {
-      "valido": false,
-      "message": "La respuesta no coincide con el subtítulo de la escena. Intente nuevamente."
-    }
-    ```
-  * **`400 Bad Request`** - Desafío ya resuelto previamente:
-    ```json
-    { "valido": false, "message": "Este desafío ya ha sido resuelto anteriormente" }
-    ```
-  * **`400 Bad Request`** - Desafío vencido por tiempo:
-    ```json
-    { "valido": false, "message": "El desafío ha expirado. Solicite un nuevo desafío." }
-    ```
-  * **`404 Not Found`** - Token inexistente:
-    ```json
-    { "message": "Desafío no encontrado o token inválido" }
-    ```
+* **Respuesta Exitosa (`200 OK`):** `{ "valido": true, "message": "Verificación humana exitosa", "desafio_id": "...", "token": "..." }`.
+* **Errores:** `400 Bad Request` (respuesta errónea, reto ya resuelto o expirado), `404 Not Found` (token inexistente).
 
 ---
 
 ### 6.11. GET /escenas - Listado del Catálogo de Escenas
-Recupera el listado completo de escenas cinematográficas y televisivas con sus actores, personajes y URL pública de la imagen.
-
-* **Método:** `GET`
-* **URL:** `/escenas`
-* **Acceso:** Público
-* **Parámetros de Consulta (Opcionales):**
-  * `obra_id` (`integer`): Filtra escenas pertenecientes a una obra concreta.
-  * `dificultad` (`facil`, `medio`, `dificil`): Filtra por dificultad.
-* **Respuesta Exitosa (`200 OK`):**
-  ```json
-  [
-    {
-      "id": 1,
-      "imagen_de_escena": "matrix_pastilla_azul_roja.jpg",
-      "imagen_url": "http://localhost:3000/imagenes/matrix_pastilla_azul_roja.jpg",
-      "subtitulo_texto": "Toma la pastilla azul y el fin de la historia...",
-      "minuto_escena": 28.45,
-      "dificultad": "medio",
-      "obra_titulo": "The Matrix",
-      "actor_nombre": "Laurence Fishburne",
-      "personaje_nombre": "Morpheus"
-    }
-  ]
-  ```
+* **Acceso:** Público (`subtitulo_texto` omitido) / Admin autenticado (`subtitulo_texto` incluido).
+* **Query Params (Opcionales):** `obra_id` (entero positivo), `dificultad` (`facil` | `medio` | `dificil`).
+* **Errores:** `400 Bad Request` ante filtros inválidos.
 
 ---
 
 ### 6.12. GET /escenas/:id - Detalle de Escena por ID
-* **Método:** `GET`
-* **URL:** `/escenas/:id`
-* **Acceso:** Público
-* **Respuesta Exitosa (`200 OK`):** Retorna el objeto de la escena individual con su `imagen_url`.
+* **Acceso:** Público (`subtitulo_texto` omitido) / Admin autenticado (`subtitulo_texto` incluido).
+* **Errores:** `400 Bad Request` (ID inválido), `404 Not Found`.
 
 ---
 
 ### 6.13. GET /obras - Catálogo de Obras Audiovisuales
-* **Método:** `GET`
-* **URL:** `/obras`
 * **Acceso:** Público
-* **Respuesta Exitosa (`200 OK`):**
-  ```json
-  [
-    {
-      "id": 1,
-      "titulo": "The Matrix",
-      "tipo": "pelicula",
-      "anio_estreno": 1999,
-      "total_escenas": 1
-    }
-  ]
-  ```
+* **Respuesta (`200 OK`):** Lista de obras con su conteo `total_escenas`.
 
 ---
 
 ### 6.14. GET /obras/:id - Detalle de Obra con Escenas Asociadas
-* **Método:** `GET`
-* **URL:** `/obras/:id`
-* **Acceso:** Público
-* **Respuesta Exitosa (`200 OK`):** Objeto de la obra con el arreglo `escenas` anidado.
+* **Acceso:** Público (`subtitulo_texto` omitido en escenas anidadas) / Admin autenticado (`subtitulo_texto` incluido).
+* **Errores:** `400 Bad Request` (ID inválido), `404 Not Found`.
 
 ---
 
 ### 6.15. GET /imagenes/:archivo - Servicio de Archivos Estáticos
-Servidor de archivos estáticos montado sobre `public/imagenes/`. Entrega directamente la imagen JPEG/PNG con encabezado `Content-Type: image/jpeg`.
+Servidor estático montado sobre `public/imagenes/`. Entrega las 8 escenas JPEG HD (`1280×720`) con subtítulos cinematográficos incrustados (`Content-Type: image/jpeg`).
 
 ---
 
 ## 🚦 7. Códigos de Estado y Manejo de Errores
 
-La API sigue rigurosamente las convenciones de la especificación RFC 9110 para códigos de estado HTTP:
-
 | Código | Nombre Estándar | Contexto en API Media |
 | :---: | :--- | :--- |
-| `200` | **OK** | Operación de lectura, actualización o eliminación ejecutada con éxito. |
-| `201` | **Created** | Registro exitoso de un nuevo recurso usuario. |
-| `400` | **Bad Request** | Fallo de validación sintáctica (campos faltantes, formato RegEx inválido o ID no numérico). |
-| `401` | **Unauthorized** | Error de autenticación: credenciales inválidas en login, token ausente, formato de token incorrecto o token expirado. |
-| `403` | **Forbidden** | Autorización denegada: token con firma adulterada o rol insuficiente (ej. intentar eliminar sin rol `admin`). |
-| `404` | **Not Found** | El recurso solicitado por ID o ruta no fue hallado. |
-| `409` | **Conflict** | Conflicto de unicidad en la base de datos (ej. correo electrónico duplicado). |
-| `500` | **Internal Server Error** | Excepción o fallo no controlado en el servidor o pool de conexiones de base de datos. |
+| `200` | **OK** | Lectura, actualización, eliminación o validación CAPTCHA exitosa. |
+| `201` | **Created** | Creación exitosa de un usuario o desafío CAPTCHA. |
+| `400` | **Bad Request** | Campos faltantes, RegEx inválido, filtro/ID inválido o reto CAPTCHA fallido/expirado/resuelto. |
+| `401` | **Unauthorized** | Credenciales erróneas en login, token ausente, mal formado o expirado. |
+| `403` | **Forbidden** | Token adulterado, intento de escalar a `admin`, intento de editar cuenta ajena (BOLA) o falta de rol `admin`. |
+| `404` | **Not Found** | Usuario, escena, obra, desafío o ruta no encontrada. |
+| `409` | **Conflict** | Correo electrónico ya registrado por otro usuario. |
+| `500` | **Internal Server Error** | Error no controlado en servidor o conexión a base de datos. |
 
 ---
 
 ## 🧪 8. Suite de Pruebas Automatizadas
 
-El proyecto cuenta con una cobertura integral de **49 pruebas automatizadas** divididas en 4 suites ejecutadas mediante **Vitest** y **Supertest**:
+El proyecto cuenta con una cobertura integral de **58 pruebas automatizadas** divididas en 4 suites ejecutadas mediante **Vitest** y **Supertest**:
 
 ```bash
-# Ejecutar la suite completa de pruebas (49 tests)
+# Ejecutar la suite completa de pruebas (58 tests)
 npm test
 
 # Ejecutar pruebas en modo observador interactivo (watch mode)
 npm run test:watch
 ```
 
-### 1. Pruebas Unitarias (`tests/jwt.test.js`) - 7 tests
-* Firma correcta de tokens JWT con claims (`id`, `correo`, `rol`).
-* Verificación exitosa de payloads válidos.
-* Manejo de rechazo ante firmas inválidas o claves alteradas.
-* Detección y lanzamiento de excepción ante tokens expirados.
+### 1. Pruebas Unitarias (`tests/jwt.test.js`) - 9 tests
+* Firma y verificación de tokens JWT (`id`, `correo`, `rol`).
+* Detección de tokens inválidos y expirados (`401`).
+* Pruebas unitarias de `verificarAuth`, `verificarAuthOpcional`, `soloAdmin`, `propietarioOAdmin` y `permitirRoles`.
 
-### 2. Pruebas de Integración de Usuarios (`tests/usuarios.test.js`) - 24 tests
-* Verificación del endpoint raíz público `GET /`.
-* Registro exitoso de usuarios `POST /usuarios` verificando persistencia real en MySQL.
-* Validación estricta de RegEx para nombres con caracteres especiales, correos inválidos y contraseñas débiles.
-* Comprobación de rechazo de roles no permitidos (`400 Bad Request`).
-* Detección de correos duplicados (`409 Conflict`).
-* Flujo de inicio de sesión `POST /usuarios/login` y verificación de hash bcrypt.
-* Acceso a rutas protegidas con y sin header `Authorization: Bearer <token>`.
-* Control de acceso RBAC: rechazo de usuarios regulares en `DELETE /usuarios/:id` y autorización para usuarios `admin`.
-* Manejo de IDs inválidos y recursos inexistentes (`404 Not Found`).
+### 2. Pruebas de Integración de Usuarios (`tests/usuarios.test.js`) - 27 tests
+* Healthcheck público `GET /`.
+* Registro de usuarios `POST /usuarios` y validaciones RegEx de nombres, correos, contraseñas y dominio de roles.
+* Seguridad RBAC en registro: bloqueo `403` ante intento público de asignarse rol `admin` y creación exitosa `201` con token de administrador.
+* Login `POST /usuarios/login`, emisión de JWT y rechazo `401` de credenciales inválidas.
+* Protección de rutas (`401` sin token / mal formato, `403` firma alterada).
+* Seguridad Anti-BOLA en `PUT /usuarios/:id`: bloqueo `403` al intentar editar otro usuario y éxito `200` sobre la propia cuenta.
+* Eliminación exclusiva para administradores en `DELETE /usuarios/:id` (`403` cliente vs `200` admin) y comprobación `404` posterior.
 
-### 3. Pruebas de Integración de Escenas, Demo y Obras (`tests/escenas.test.js`) - 11 tests
-* Listado general de escenas `GET /escenas` con generación dinámica de `imagen_url`.
-* Filtrado por nivel de dificultad `GET /escenas?dificultad=facil`.
-* Detalle de escena existente `GET /escenas/:id` y manejo de 404 / 400.
-* Entrega de archivos estáticos `GET /imagenes/:archivo` con cabecera `Content-Type: image/jpeg`.
-* Entrega de la interfaz web interactiva `GET /demo/` con cabecera `Content-Type: text/html`.
-* Verificación de cabeceras CORS en peticiones preflight OPTIONS.
-* Listado y detalle de obras con escenas anidadas `GET /obras`.
-* Manejador global de rutas 404 en formato JSON.
+### 3. Pruebas de Integración de Escenas, Demo y Obras (`tests/escenas.test.js`) - 13 tests
+* Catálogo `GET /escenas` verificando que `subtitulo_texto` se oculta al público y se incluye para `admin`.
+* Filtrado por dificultad válida (`200`) y rechazo de dificultad inválida (`400`).
+* Detalle `GET /escenas/:id` (`200`, `404`, `400`).
+* Servicio real de imágenes JPEG HD `GET /imagenes/:archivo` verificando tamaño y `Content-Type: image/jpeg`.
+* Servicio de Web Demo `GET /demo/`, cabeceras CORS y catálogo de obras `GET /obras` / `GET /obras/:id`.
+* Manejador global JSON `404`.
 
-### 4. Pruebas de Integración del Motor CAPTCHA (`tests/captcha.test.js`) - 7 tests
-* Generación de desafíos `GET /captcha/nuevo` certificando que el subtítulo esperado no se expone al cliente.
-* Validación exitosa `POST /captcha/validar` con tolerancia semántica a mayúsculas y tildes (200 OK).
-* Rechazo de desafíos ya resueltos anteriormente (400 Bad Request).
-* Rechazo ante respuestas incorrectas que no coinciden con el subtítulo (400 Bad Request).
-* Validación de obligatoriedad de campos y tokens inexistentes (404 Not Found).
+### 4. Pruebas de Integración del Motor CAPTCHA (`tests/captcha.test.js`) - 9 tests
+* Generación `GET /captcha/nuevo`, filtrado por dificultad y rechazo `400` de dificultad inválida, sin filtrar jamás el subtítulo.
+* Validación `POST /captcha/validar` tolerante a mayúsculas y tildes (`200 OK`).
+* Rechazo de desafíos ya resueltos y prevención de replay con espacios en el token (`400 Bad Request`).
+* Rechazo ante respuestas erróneas (`400`), campos faltantes (`400`) y tokens inexistentes (`404`).
 
 ---
 
 ## 🚀 9. Fases del Proyecto y Roadmap
 
-* ✅ **Fase 1 (Completada):** Subsistema de Gestión de Usuarios, Autenticación JWT, Hasheo Bcrypt (12 rondas), RBAC y validaciones RegEx.
-* ✅ **Fase 2 (Completada):** Servidor de archivos estáticos multimedia (`public/imagenes/`), catálogo de escenas y obras, y motor completo de generación y validación de desafíos CAPTCHA cultural (`/captcha/nuevo`, `/captcha/validar`).
-* 🔮 **Fase 3 (Futura):** Panel de administración en frontend (React / Vue) e integración de biblioteca cliente para inclusión de CAPTCHA mediante un componente web (`<CulturalCaptcha />`).
+* ✅ **Fase 1 (Completada):** Subsistema de Gestión de Usuarios, Autenticación JWT, Hasheo Bcrypt (12 rondas), RBAC con protección de titularidad (`propietarioOAdmin`) y validaciones RegEx.
+* ✅ **Fase 2 (Completada):** Escenas HD (`1280×720`) con subtítulos incrustados (`public/imagenes/`), catálogo protegido contra scraping, motor CAPTCHA cultural (`/captcha/nuevo`, `/captcha/validar`), Swagger UI (`/api-docs`) y Web Demo interactiva (`/demo`).
+* 🔮 **Fase 3 (Futura):** Panel de administración ABM completo para carga dinámica de nuevas obras/escenas y widget embebible (`<CulturalCaptcha />`) para terceros.
