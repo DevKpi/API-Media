@@ -6,12 +6,21 @@ import { firmarToken } from "../src/utils/jwt.js";
 
 describe("Pruebas de Integración - Endpoints de Usuarios y Seguridad JWT (Vitest + Supertest)", () => {
   let usuarioCreadoId = null;
+  let adminTemporalId = null;
   let tokenCliente = null;
-  let tokenAdmin = null;
+  const tokenAdmin = firmarToken({
+    id: 9999,
+    correo: "admin@apimedia.com",
+    rol: "admin",
+  });
   const timestamp = Date.now();
   const correoPrueba = `test_${timestamp}@ejemplo.com`;
+  const correoAdminTemporal = `admin_temp_${timestamp}@ejemplo.com`;
 
   afterAll(async () => {
+    if (adminTemporalId) {
+      await pool.query("DELETE FROM usuarios WHERE id = ?", [adminTemporalId]);
+    }
     // Cerrar el pool de conexiones para que las pruebas finalicen limpiamente
     await pool.end();
   });
@@ -43,13 +52,36 @@ describe("Pruebas de Integración - Endpoints de Usuarios y Seguridad JWT (Vites
     expect(res.body.usuario.correo).toBe(correoPrueba);
 
     usuarioCreadoId = res.body.usuario.id;
+  });
 
-    // Generar un token de administrador firmado para pruebas de autorización
-    tokenAdmin = firmarToken({
-      id: 9999,
-      correo: "admin@apimedia.com",
-      rol: "admin",
-    });
+  it("POST /usuarios [Seguridad RBAC] - Debería bloquear con 403 el registro público con rol 'admin' sin token de administrador", async () => {
+    const res = await request(app)
+      .post("/usuarios")
+      .send({
+        nombre: "Intruso",
+        correo: `intruso_${timestamp}@ejemplo.com`,
+        contrasena: "ClaveSegura123",
+        rol: "admin",
+      });
+
+    expect(res.status).toBe(403);
+    expect(res.body.message).toContain("solo un administrador autenticado puede asignar el rol 'admin'");
+  });
+
+  it("POST /usuarios [Seguridad RBAC] - Debería permitir crear un usuario 'admin' cuando lo solicita un administrador autenticado (201)", async () => {
+    const res = await request(app)
+      .post("/usuarios")
+      .set("Authorization", `Bearer ${tokenAdmin}`)
+      .send({
+        nombre: "Admin Auxiliar",
+        correo: correoAdminTemporal,
+        contrasena: "ClaveSegura123",
+        rol: "admin",
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.usuario.rol).toBe("admin");
+    adminTemporalId = res.body.usuario.id;
   });
 
   // --- 2. Pruebas de Login y Emisión de Token JWT ---
@@ -254,7 +286,17 @@ describe("Pruebas de Integración - Endpoints de Usuarios y Seguridad JWT (Vites
     expect(res.status).toBe(401);
   });
 
-  it("PUT /usuarios/:id - Debería actualizar los datos del usuario con token válido (200)", async () => {
+  it("PUT /usuarios/:id [Seguridad BOLA] - Debería impedir con 403 que un cliente modifique la cuenta de otro usuario", async () => {
+    const res = await request(app)
+      .put(`/usuarios/${adminTemporalId}`)
+      .set("Authorization", `Bearer ${tokenCliente}`)
+      .send({ nombre: "Intento Modificar Ajeno" });
+
+    expect(res.status).toBe(403);
+    expect(res.body.message).toContain("solo puedes modificar tu propia cuenta");
+  });
+
+  it("PUT /usuarios/:id - Debería actualizar los datos del propio usuario con token válido (200)", async () => {
     expect(usuarioCreadoId).toBeDefined();
 
     const cambios = {

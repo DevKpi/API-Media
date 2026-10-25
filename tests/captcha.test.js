@@ -40,6 +40,13 @@ describe("Pruebas de Integración - Motor CAPTCHA Cultural (Generación y Valida
     expect(res.body.dificultad).toBe("facil");
   });
 
+  it("GET /captcha/nuevo?dificultad=extremo - Debería rechazar dificultades inválidas (400)", async () => {
+    const res = await request(app).get("/captcha/nuevo?dificultad=extremo");
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toContain("dificultad proporcionada no es válida");
+  });
+
   // --- 2. Validación de Desafíos ---
 
   it("POST /captcha/validar - Debería validar exitosamente con la respuesta correcta (tolerando tildes y mayúsculas)", async () => {
@@ -80,6 +87,35 @@ describe("Pruebas de Integración - Motor CAPTCHA Cultural (Generación y Valida
     expect(res.status).toBe(400);
     expect(res.body.valido).toBe(false);
     expect(res.body.message).toContain("ya ha sido resuelto anteriormente");
+  });
+
+  it("POST /captcha/validar - Debería marcar como resuelto aun si el token enviado tiene espacios alrededor (sin permitir replay)", async () => {
+    const nuevoRes = await request(app).get("/captcha/nuevo");
+    const tokenNuevo = nuevoRes.body.token;
+
+    const [rows] = await pool.query(
+      "SELECT respuesta_esperada FROM desafios_captcha WHERE token = ?",
+      [tokenNuevo]
+    );
+
+    const resOk = await request(app)
+      .post("/captcha/validar")
+      .send({
+        token: `  ${tokenNuevo}  `,
+        respuesta: rows[0].respuesta_esperada,
+      });
+    expect(resOk.status).toBe(200);
+    expect(resOk.body.valido).toBe(true);
+
+    // Segundo intento con el mismo token debe fallar porque ya quedó marcado como resuelto
+    const resReplay = await request(app)
+      .post("/captcha/validar")
+      .send({
+        token: tokenNuevo,
+        respuesta: rows[0].respuesta_esperada,
+      });
+    expect(resReplay.status).toBe(400);
+    expect(resReplay.body.valido).toBe(false);
   });
 
   it("POST /captcha/validar - Debería rechazar si la respuesta es incorrecta (400)", async () => {

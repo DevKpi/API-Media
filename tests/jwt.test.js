@@ -1,6 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { firmarToken, verificarToken } from "../src/utils/jwt.js";
-import { verificarAuth, soloAdmin, permitirRoles } from "../src/middlewares/auth.js";
+import {
+  verificarAuth,
+  verificarAuthOpcional,
+  soloAdmin,
+  propietarioOAdmin,
+  permitirRoles,
+} from "../src/middlewares/auth.js";
 
 describe("Pruebas Unitarias - Módulo JWT y Middlewares de Autenticación", () => {
   it("Debería firmar y verificar un token exitosamente", () => {
@@ -64,6 +70,25 @@ describe("Pruebas Unitarias - Módulo JWT y Middlewares de Autenticación", () =
     expect(jsonBody.message).toContain("Token expirado");
   });
 
+  it("verificarAuthOpcional debería continuar como público si no hay token o si es inválido", () => {
+    const reqSinToken = { headers: {} };
+    let next1 = false;
+    verificarAuthOpcional(reqSinToken, {}, () => {
+      next1 = true;
+    });
+    expect(next1).toBe(true);
+    expect(reqSinToken.usuario).toBeNull();
+
+    const tokenValido = firmarToken({ id: 1, rol: "admin" });
+    const reqConToken = { headers: { authorization: `Bearer ${tokenValido}` } };
+    let next2 = false;
+    verificarAuthOpcional(reqConToken, {}, () => {
+      next2 = true;
+    });
+    expect(next2).toBe(true);
+    expect(reqConToken.usuario.rol).toBe("admin");
+  });
+
   it("soloAdmin debería permitir el paso si el usuario es admin", () => {
     const req = { usuario: { id: 1, rol: "admin" } };
     let nextLlamado = false;
@@ -99,6 +124,35 @@ describe("Pruebas Unitarias - Módulo JWT y Middlewares de Autenticación", () =
     expect(nextLlamado).toBe(false);
     expect(statusCode).toBe(403);
     expect(jsonBody.message).toContain("se requieren privilegios de administrador");
+  });
+
+  it("propietarioOAdmin debería permitir al titular o admin, y bloquear a terceros con 403", () => {
+    // Titular permitido
+    const reqPropio = { params: { id: "5" }, usuario: { id: 5, rol: "cliente" } };
+    let nextPropio = false;
+    propietarioOAdmin(reqPropio, {}, () => {
+      nextPropio = true;
+    });
+    expect(nextPropio).toBe(true);
+
+    // Tercero bloqueado
+    const reqAjeno = { params: { id: "1" }, usuario: { id: 5, rol: "cliente" } };
+    let statusCode = null;
+    const res = {
+      status(code) {
+        statusCode = code;
+        return this;
+      },
+      json() {
+        return this;
+      },
+    };
+    let nextAjeno = false;
+    propietarioOAdmin(reqAjeno, res, () => {
+      nextAjeno = true;
+    });
+    expect(nextAjeno).toBe(false);
+    expect(statusCode).toBe(403);
   });
 
   it("permitirRoles debería permitir accesos configurados y denegar no autorizados", () => {

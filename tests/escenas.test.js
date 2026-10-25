@@ -2,15 +2,22 @@ import { describe, it, expect, afterAll } from "vitest";
 import request from "supertest";
 import app from "../index.js";
 import pool from "../src/config/db.js";
+import { firmarToken } from "../src/utils/jwt.js";
 
 describe("Pruebas de Integración - Endpoints de Escenas, Obras e Imágenes Estáticas", () => {
+  const tokenAdmin = firmarToken({
+    id: 1,
+    correo: "admin@apimedia.com",
+    rol: "admin",
+  });
+
   afterAll(async () => {
     await pool.end();
   });
 
   // --- 1. Endpoints de Escenas ---
 
-  it("GET /escenas - Debería retornar el listado completo de escenas activas con URL de imagen", async () => {
+  it("GET /escenas - Debería retornar escenas activas ocultando subtitulo_texto al público para evitar bots", async () => {
     const res = await request(app).get("/escenas");
 
     expect(res.status).toBe(200);
@@ -22,8 +29,18 @@ describe("Pruebas de Integración - Endpoints de Escenas, Obras e Imágenes Est�
     expect(primeraEscena).toHaveProperty("imagen_de_escena");
     expect(primeraEscena).toHaveProperty("imagen_url");
     expect(primeraEscena.imagen_url).toContain("/imagenes/");
-    expect(primeraEscena).toHaveProperty("subtitulo_texto");
     expect(primeraEscena).toHaveProperty("obra_titulo");
+    expect(primeraEscena.subtitulo_texto).toBeUndefined();
+  });
+
+  it("GET /escenas (Admin) - Debería incluir subtitulo_texto cuando consulta un administrador autenticado", async () => {
+    const res = await request(app)
+      .get("/escenas")
+      .set("Authorization", `Bearer ${tokenAdmin}`);
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body[0]).toHaveProperty("subtitulo_texto");
   });
 
   it("GET /escenas?dificultad=facil - Debería filtrar las escenas por dificultad", async () => {
@@ -36,7 +53,14 @@ describe("Pruebas de Integración - Endpoints de Escenas, Obras e Imágenes Est�
     });
   });
 
-  it("GET /escenas/:id - Debería retornar el detalle de una escena existente (200)", async () => {
+  it("GET /escenas?dificultad=invalida - Debería retornar 400 ante una dificultad no válida", async () => {
+    const res = await request(app).get("/escenas?dificultad=invalida");
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toContain("dificultad proporcionada no es válida");
+  });
+
+  it("GET /escenas/:id - Debería retornar el detalle público de una escena existente sin exponer el subtítulo (200)", async () => {
     const res = await request(app).get("/escenas/1");
 
     expect(res.status).toBe(200);
@@ -44,6 +68,7 @@ describe("Pruebas de Integración - Endpoints de Escenas, Obras e Imágenes Est�
     expect(res.body.imagen_de_escena).toBe("matrix_pastilla_azul_roja.jpg");
     expect(res.body.imagen_url).toContain("/imagenes/matrix_pastilla_azul_roja.jpg");
     expect(res.body.obra_titulo).toBe("The Matrix");
+    expect(res.body.subtitulo_texto).toBeUndefined();
   });
 
   it("GET /escenas/:id - Debería retornar 404 para una escena inexistente", async () => {
@@ -62,11 +87,12 @@ describe("Pruebas de Integración - Endpoints de Escenas, Obras e Imágenes Est�
 
   // --- 2. Servicio de Archivos Estáticos ---
 
-  it("GET /imagenes/:archivo - Debería servir la imagen estática correctamente (200)", async () => {
+  it("GET /imagenes/:archivo - Debería servir la imagen estática HD con subtítulo correctamente (200)", async () => {
     const res = await request(app).get("/imagenes/matrix_pastilla_azul_roja.jpg");
 
     expect(res.status).toBe(200);
     expect(res.headers["content-type"]).toContain("image/jpeg");
+    expect(res.body.length).toBeGreaterThan(10000);
   });
 
   it("GET /demo - Debería servir la interfaz web interactiva HTML (200)", async () => {
@@ -99,13 +125,14 @@ describe("Pruebas de Integración - Endpoints de Escenas, Obras e Imágenes Est�
     expect(obra).toHaveProperty("total_escenas");
   });
 
-  it("GET /obras/:id - Debería retornar el detalle de una obra con sus escenas anidadas", async () => {
+  it("GET /obras/:id - Debería retornar el detalle de una obra con sus escenas anidadas sin exponer subtítulos al público", async () => {
     const res = await request(app).get("/obras/1");
 
     expect(res.status).toBe(200);
     expect(res.body.id).toBe(1);
     expect(res.body.titulo).toBe("The Matrix");
     expect(Array.isArray(res.body.escenas)).toBe(true);
+    expect(res.body.escenas[0].subtitulo_texto).toBeUndefined();
   });
 
   // --- 4. Manejador de Rutas no encontradas (404) ---
