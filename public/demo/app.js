@@ -1,12 +1,22 @@
 // ==========================================================================
 // Configuración y Variables de Estado Global
 // ==========================================================================
-const API_BASE = window.location.origin.includes("localhost") || window.location.origin.includes("127.0.0.1")
-  ? window.location.origin
-  : "http://localhost:3000";
+const API_BASE =
+  window.location.origin.includes("localhost") || window.location.origin.includes("127.0.0.1")
+    ? window.location.origin
+    : "http://localhost:3000";
 
 let currentCaptchaToken = null;
 let captchaTimerInterval = null;
+
+function escapeHtml(str = "") {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
 
 // ==========================================================================
 // Inicialización
@@ -80,7 +90,9 @@ async function generarNuevoDesafio(dificultad = "") {
   alertResult.classList.add("hidden");
 
   try {
-    const url = dificultad ? `${API_BASE}/captcha/nuevo?dificultad=${dificultad}` : `${API_BASE}/captcha/nuevo`;
+    const url = dificultad
+      ? `${API_BASE}/captcha/nuevo?dificultad=${encodeURIComponent(dificultad)}`
+      : `${API_BASE}/captcha/nuevo`;
     const res = await fetch(url);
     const data = await res.json();
 
@@ -135,7 +147,7 @@ async function validarDesafioCaptcha(token, respuesta) {
       alertResult.innerHTML = `
         <strong>✅ ¡Verificación Exitosa!</strong><br>
         Has demostrado ser un humano. La transcripción cultural coincide satisfactoriamente.<br>
-        <small style="opacity: 0.8">Desafío ID: ${data.desafio_id}</small>
+        <small style="opacity: 0.8">Desafío ID: ${escapeHtml(data.desafio_id)}</small>
       `;
       badgeMeta.textContent = "Resuelto";
       badgeMeta.className = "badge badge-success";
@@ -144,7 +156,7 @@ async function validarDesafioCaptcha(token, respuesta) {
       alertResult.classList.add("alert-danger");
       alertResult.innerHTML = `
         <strong>❌ Verificación Fallida</strong><br>
-        ${data.message || "El texto ingresado no coincide con el subtítulo."}
+        ${escapeHtml(data.message || "El texto ingresado no coincide con el subtítulo.")}
       `;
     }
   } catch (error) {
@@ -172,7 +184,8 @@ function iniciarTemporizador(expiraEnIso) {
       timerBadge.className = "badge badge-neutral";
       const alertResult = document.getElementById("captcha-result");
       alertResult.className = "alert-box alert-danger";
-      alertResult.textContent = "El tiempo de este desafío ha expirado. Por favor genera uno nuevo.";
+      alertResult.textContent =
+        "El tiempo de este desafío ha expirado. Por favor genera uno nuevo.";
       alertResult.classList.remove("hidden");
       return;
     }
@@ -286,9 +299,15 @@ async function realizarRegistro(datos) {
   alertBox.classList.add("hidden");
 
   try {
+    const headers = { "Content-Type": "application/json" };
+    const activeToken = localStorage.getItem("api_media_token");
+    if (activeToken) {
+      headers["Authorization"] = `Bearer ${activeToken}`;
+    }
+
     const res = await fetch(`${API_BASE}/usuarios`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(datos),
     });
 
@@ -321,6 +340,20 @@ function checkStoredSession() {
   }
 }
 
+function sincronizarSelectorRolRegistro(esAdmin) {
+  const optAdmin = document.getElementById("opt-reg-admin");
+  const selectRol = document.getElementById("reg-rol");
+  if (!optAdmin || !selectRol) return;
+
+  optAdmin.disabled = !esAdmin;
+  optAdmin.textContent = esAdmin
+    ? "Administrador"
+    : "Administrador (Requiere sesión Admin)";
+  if (!esAdmin && selectRol.value === "admin") {
+    selectRol.value = "cliente";
+  }
+}
+
 function actualizarVistaSesion(user, token) {
   document.getElementById("session-unauthenticated").classList.add("hidden");
   document.getElementById("session-authenticated").classList.remove("hidden");
@@ -334,6 +367,8 @@ function actualizarVistaSesion(user, token) {
   document.getElementById("profile-email").textContent = user.correo;
   document.getElementById("profile-role").textContent = user.rol || "cliente";
   document.getElementById("active-jwt-token").value = token;
+
+  sincronizarSelectorRolRegistro(user.rol === "admin");
 }
 
 function cerrarSesion() {
@@ -348,6 +383,7 @@ function cerrarSesion() {
   badge.className = "badge badge-neutral";
 
   document.getElementById("profile-json-output").textContent = "// Sesión cerrada";
+  sincronizarSelectorRolRegistro(false);
 }
 
 async function consultarPerfilActual() {
@@ -391,14 +427,24 @@ async function cargarCatalogo() {
   grid.innerHTML = "";
 
   try {
-    const url = filtroDificultad ? `${API_BASE}/escenas?dificultad=${filtroDificultad}` : `${API_BASE}/escenas`;
-    const res = await fetch(url);
+    const url = filtroDificultad
+      ? `${API_BASE}/escenas?dificultad=${encodeURIComponent(filtroDificultad)}`
+      : `${API_BASE}/escenas`;
+
+    const headers = {};
+    const token = localStorage.getItem("api_media_token");
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    const res = await fetch(url, { headers });
     const escenas = await res.json();
 
     loading.classList.add("hidden");
 
     if (!Array.isArray(escenas) || escenas.length === 0) {
-      grid.innerHTML = "<p style='color: var(--text-muted);'>No hay escenas disponibles con este filtro.</p>";
+      grid.innerHTML =
+        "<p style='color: var(--text-muted);'>No hay escenas disponibles con este filtro.</p>";
       return;
     }
 
@@ -406,16 +452,20 @@ async function cargarCatalogo() {
       .map(
         (e) => `
         <div class="scene-card">
-          <img src="${e.imagen_url}" alt="${e.obra_titulo}" class="scene-card-img" onerror="this.src='data:image/svg+xml;charset=utf-8,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'300\\' height=\\'140\\'%3E%3Crect width=\\'300\\' height=\\'140\\' fill=\\'%231e293b\\'/%3E%3Ctext x=\\'50%25\\' y=\\'50%25\\' fill=\\'%2394a3b8\\' dominant-baseline=\\'middle\\' text-anchor=\\'middle\\'%3EEscena ${e.id}%3C/text%3E%3C/svg%3E'">
+          <img src="${escapeHtml(e.imagen_url)}" alt="${escapeHtml(e.obra_titulo)}" class="scene-card-img" onerror="this.src='data:image/svg+xml;charset=utf-8,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'300\\' height=\\'140\\'%3E%3Crect width=\\'300\\' height=\\'140\\' fill=\\'%231e293b\\'/%3E%3Ctext x=\\'50%25\\' y=\\'50%25\\' fill=\\'%2394a3b8\\' dominant-baseline=\\'middle\\' text-anchor=\\'middle\\'%3EEscena ${Number(e.id)}%3C/text%3E%3C/svg%3E'">
           <div class="scene-card-body">
             <div>
-              <h3 class="scene-card-title">${e.obra_titulo}</h3>
-              <p class="scene-card-meta">${e.personaje_nombre || "Personaje"} (${e.actor_nombre || "Actor"}) • Minuto ${e.minuto_escena}</p>
-              <blockquote class="scene-card-quote">"${e.subtitulo_texto}"</blockquote>
+              <h3 class="scene-card-title">${escapeHtml(e.obra_titulo)}</h3>
+              <p class="scene-card-meta">${escapeHtml(e.personaje_nombre || "Personaje")} (${escapeHtml(e.actor_nombre || "Actor")}) • Minuto ${escapeHtml(e.minuto_escena)}</p>
+              ${
+                e.subtitulo_texto
+                  ? `<blockquote class="scene-card-quote">"${escapeHtml(e.subtitulo_texto)}"</blockquote>`
+                  : `<p class="scene-card-quote" style="font-style: normal; color: var(--text-muted);">🔒 Subtítulo incrustado en imagen (texto JSON solo visible para Admin)</p>`
+              }
             </div>
             <div class="scene-card-footer">
-              <span class="badge ${e.dificultad === "facil" ? "badge-success" : e.dificultad === "medio" ? "badge-warning" : "badge-info"}">${e.dificultad}</span>
-              <span style="color: var(--text-muted);">ID #${e.id}</span>
+              <span class="badge ${e.dificultad === "facil" ? "badge-success" : e.dificultad === "medio" ? "badge-warning" : "badge-info"}">${escapeHtml(e.dificultad)}</span>
+              <span style="color: var(--text-muted);">ID #${Number(e.id)}</span>
             </div>
           </div>
         </div>
@@ -424,6 +474,6 @@ async function cargarCatalogo() {
       .join("");
   } catch (error) {
     loading.classList.add("hidden");
-    grid.innerHTML = `<p style="color: var(--accent-danger);">Error al cargar catálogo: ${error.message}</p>`;
+    grid.innerHTML = `<p style="color: var(--accent-danger);">Error al cargar catálogo: ${escapeHtml(error.message)}</p>`;
   }
 }
