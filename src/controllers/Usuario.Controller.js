@@ -17,8 +17,8 @@ class UsuarioController {
   // Obtener un usuario por ID
   static async obtenerUsuarioPorId(req, res) {
     try {
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) {
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id <= 0) {
         return res.status(400).json({ message: "El ID proporcionado debe ser un número válido" });
       }
 
@@ -37,7 +37,7 @@ class UsuarioController {
   // Crear un nuevo usuario
   static async crearUsuario(req, res) {
     try {
-      const { nombre, apellido, correo, contrasena, rol } = req.body;
+      const { nombre, apellido, correo, contrasena, rol } = req.body || {};
 
       if (!nombre || !correo || !contrasena) {
         return res.status(400).json({
@@ -45,8 +45,21 @@ class UsuarioController {
         });
       }
 
+      // Impedir escalada de privilegios: solo un admin autenticado puede crear otro admin
+      const rolAsignado = rol || "cliente";
+      if (rolAsignado === "admin" && (!req.usuario || req.usuario.rol !== "admin")) {
+        return res.status(403).json({
+          message:
+            "Acceso denegado: solo un administrador autenticado puede asignar el rol 'admin'",
+        });
+      }
+
+      const nombreLimpio = nombre.trim();
+      const apellidoLimpio = apellido ? apellido.trim() : null;
+      const correoLimpio = correo.trim().toLowerCase();
+
       // Verificar si el correo ya existe
-      const usuarioExistente = await Usuario.obtenerPorCorreo(correo);
+      const usuarioExistente = await Usuario.obtenerPorCorreo(correoLimpio);
       if (usuarioExistente) {
         return res.status(409).json({ message: "El correo ya se encuentra registrado" });
       }
@@ -56,11 +69,11 @@ class UsuarioController {
       const contrasenaHasheada = await bcrypt.hash(contrasena, saltRounds);
 
       const nuevoId = await Usuario.crear({
-        nombre,
-        apellido,
-        correo,
+        nombre: nombreLimpio,
+        apellido: apellidoLimpio,
+        correo: correoLimpio,
         contrasena: contrasenaHasheada,
-        rol,
+        rol: rolAsignado,
       });
       const usuarioCreado = await Usuario.obtenerPorId(nuevoId);
 
@@ -77,13 +90,14 @@ class UsuarioController {
   // Iniciar sesión
   static async login(req, res) {
     try {
-      const { correo, contrasena } = req.body;
+      const { correo, contrasena } = req.body || {};
 
       if (!correo || !contrasena) {
         return res.status(400).json({ message: "Correo y contraseña son obligatorios" });
       }
 
-      const usuario = await Usuario.obtenerPorCorreo(correo);
+      const correoLimpio = correo.trim().toLowerCase();
+      const usuario = await Usuario.obtenerPorCorreo(correoLimpio);
       if (!usuario) {
         return res.status(401).json({ message: "Credenciales inválidas" });
       }
@@ -133,9 +147,16 @@ class UsuarioController {
   // Actualizar un usuario existente
   static async actualizarUsuario(req, res) {
     try {
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) {
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id <= 0) {
         return res.status(400).json({ message: "El ID proporcionado debe ser un número válido" });
+      }
+
+      if (!req.usuario || (req.usuario.rol !== "admin" && req.usuario.id !== id)) {
+        return res.status(403).json({
+          message:
+            "Acceso denegado: solo puedes modificar tu propia cuenta o contar con privilegios de administrador",
+        });
       }
 
       const usuario = await Usuario.obtenerPorId(id);
@@ -143,20 +164,25 @@ class UsuarioController {
         return res.status(404).json({ message: "Usuario no encontrado" });
       }
 
-      const { nombre, apellido, correo } = req.body;
+      const { nombre, apellido, correo } = req.body || {};
       if (nombre === undefined && apellido === undefined && correo === undefined) {
         return res.status(400).json({ message: "Debe enviar al menos un campo para actualizar" });
       }
 
+      const datosActualizar = {};
+      if (nombre !== undefined) datosActualizar.nombre = nombre.trim();
+      if (apellido !== undefined) datosActualizar.apellido = apellido === null ? null : apellido.trim();
+      if (correo !== undefined) datosActualizar.correo = correo.trim().toLowerCase();
+
       // Si actualiza correo, verificar que no esté ocupado por otro usuario
-      if (correo && correo !== usuario.correo) {
-        const correoExistente = await Usuario.obtenerPorCorreo(correo);
+      if (datosActualizar.correo && datosActualizar.correo !== usuario.correo.toLowerCase()) {
+        const correoExistente = await Usuario.obtenerPorCorreo(datosActualizar.correo);
         if (correoExistente) {
           return res.status(409).json({ message: "El nuevo correo ya está en uso por otro usuario" });
         }
       }
 
-      await Usuario.actualizar(id, { nombre, apellido, correo });
+      await Usuario.actualizar(id, datosActualizar);
       const usuarioActualizado = await Usuario.obtenerPorId(id);
 
       res.status(200).json({
@@ -172,8 +198,8 @@ class UsuarioController {
   // Eliminar un usuario
   static async eliminarUsuario(req, res) {
     try {
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) {
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id <= 0) {
         return res.status(400).json({ message: "El ID proporcionado debe ser un número válido" });
       }
 

@@ -1,16 +1,7 @@
 import pool from "../config/db.js";
 
 class Usuario {
-  constructor(id, nombre, apellido, correo, rol = "cliente", creado_en = null) {
-    this.id = id;
-    this.nombre = nombre;
-    this.apellido = apellido;
-    this.correo = correo;
-    this.rol = rol;
-    this.creado_en = creado_en;
-  }
-
-  // Obtener todos los usuarios de la base de datos
+  // Obtener todos los usuarios de la base de datos (sin exponer contraseñas)
   static async obtenerTodos() {
     const [rows] = await pool.query(
       "SELECT id, nombre, apellido, correo, rol, creado_en FROM usuarios ORDER BY id ASC"
@@ -18,7 +9,7 @@ class Usuario {
     return rows;
   }
 
-  // Obtener usuario por ID
+  // Obtener usuario por ID (sin exponer contraseña)
   static async obtenerPorId(id) {
     const [rows] = await pool.query(
       "SELECT id, nombre, apellido, correo, rol, creado_en FROM usuarios WHERE id = ?",
@@ -27,19 +18,11 @@ class Usuario {
     return rows[0] || null;
   }
 
-  // Obtener usuario por Correo
+  // Obtener usuario por Correo (incluye hash de contraseña para autenticación interna)
   static async obtenerPorCorreo(correo) {
     const [rows] = await pool.query(
       "SELECT * FROM usuarios WHERE correo = ?",
       [correo]
-    );
-    return rows[0] || null;
-  }
-
-  static async obtenerPorNombre(nombre) {
-    const [rows] = await pool.query(
-      "SELECT * FROM usuarios WHERE nombre = ?",
-      [nombre]
     );
     return rows[0] || null;
   }

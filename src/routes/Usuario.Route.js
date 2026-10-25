@@ -5,13 +5,18 @@ import {
   validarActualizacionUsuario,
   validarLoginUsuario,
 } from "../middlewares/validar.js";
-import { verificarAuth, soloAdmin } from "../middlewares/auth.js";
+import {
+  verificarAuth,
+  verificarAuthOpcional,
+  soloAdmin,
+  propietarioOAdmin,
+} from "../middlewares/auth.js";
 
 const router = express.Router();
 
 // --- Rutas Públicas ---
-// Registrar nuevo usuario
-router.post("/", validarRegistroUsuario, UsuarioController.crearUsuario);
+// Registrar nuevo usuario (solo un admin autenticado puede asignar rol 'admin')
+router.post("/", verificarAuthOpcional, validarRegistroUsuario, UsuarioController.crearUsuario);
 
 // Iniciar sesión (Login)
 router.post("/login", validarLoginUsuario, UsuarioController.login);
@@ -26,10 +31,11 @@ router.get("/", verificarAuth, UsuarioController.obtenerUsuarios);
 // Obtener detalle de usuario por ID
 router.get("/:id", verificarAuth, UsuarioController.obtenerUsuarioPorId);
 
-// Actualizar datos de usuario por ID
+// Actualizar datos de usuario por ID (solo el propio titular o un administrador)
 router.put(
   "/:id",
   verificarAuth,
+  propietarioOAdmin,
   validarActualizacionUsuario,
   UsuarioController.actualizarUsuario
 );

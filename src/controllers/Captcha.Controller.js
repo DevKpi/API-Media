@@ -2,6 +2,8 @@ import crypto from "crypto";
 import Escena from "../models/Escena.model.js";
 import Desafio from "../models/Desafio.model.js";
 
+const DIFICULTADES_VALIDAS = ["facil", "medio", "dificil"];
+
 // Función auxiliar para normalizar texto (remueve tildes, mayúsculas, signos y espacios extras)
 function normalizarTexto(texto = "") {
   return texto
@@ -47,6 +49,12 @@ class CaptchaController {
     try {
       const { dificultad } = req.query;
 
+      if (dificultad !== undefined && !DIFICULTADES_VALIDAS.includes(dificultad)) {
+        return res.status(400).json({
+          message: "La dificultad proporcionada no es válida. Debe ser 'facil', 'medio' o 'dificil'",
+        });
+      }
+
       // Limpiar desafíos pendientes vencidos en segundo plano
       await Desafio.limpiarExpirados();
 
@@ -59,7 +67,7 @@ class CaptchaController {
 
       const id = crypto.randomUUID();
       const token = `tok_${crypto.randomBytes(24).toString("hex")}`;
-      
+
       // Plazo de expiración: 10 minutos
       const expiraEn = new Date(Date.now() + 10 * 60 * 1000);
 
@@ -94,17 +102,20 @@ class CaptchaController {
   // Validar la respuesta enviada por el usuario para un desafío
   static async validarDesafio(req, res) {
     try {
-      const { token, respuesta } = req.body;
+      const { token, respuesta } = req.body || {};
 
       if (!token || typeof token !== "string" || !token.trim()) {
         return res.status(400).json({ message: "El token del desafío es obligatorio" });
       }
 
       if (respuesta === undefined || typeof respuesta !== "string" || !respuesta.trim()) {
-        return res.status(400).json({ message: "Debe ingresar una respuesta para validar el desafío" });
+        return res
+          .status(400)
+          .json({ message: "Debe ingresar una respuesta para validar el desafío" });
       }
 
-      const desafio = await Desafio.obtenerPorToken(token.trim());
+      const tokenLimpio = token.trim();
+      const desafio = await Desafio.obtenerPorToken(tokenLimpio);
 
       if (!desafio) {
         return res.status(404).json({ message: "Desafío no encontrado o token inválido" });
@@ -120,7 +131,7 @@ class CaptchaController {
       const ahora = new Date();
       if (desafio.estado === "expirado" || new Date(desafio.expira_en) < ahora) {
         if (desafio.estado !== "expirado") {
-          await Desafio.actualizarEstado(token, "expirado");
+          await Desafio.actualizarEstado(tokenLimpio, "expirado");
         }
         return res.status(400).json({
           valido: false,
@@ -136,7 +147,7 @@ class CaptchaController {
       const esCorrecta = normalizadaUsuario === normalizadaEsperada || similitud >= 0.85;
 
       if (esCorrecta) {
-        await Desafio.actualizarEstado(token, "resuelto");
+        await Desafio.actualizarEstado(tokenLimpio, "resuelto");
         return res.status(200).json({
           valido: true,
           message: "Verificación humana exitosa",
@@ -156,4 +167,5 @@ class CaptchaController {
   }
 }
 
+export { normalizarTexto, calcularSimilitud };
 export default CaptchaController;
